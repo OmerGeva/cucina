@@ -73,6 +73,26 @@ fn set_group_icon(state: State<'_, AppState>, name: String, icon: String) -> Res
     state.sup.set_group_icon(&name, &icon)
 }
 
+/// Every worktree a server could run from. Empty when its directory isn't a
+/// git repository, which the UI reads as "hide the picker".
+#[tauri::command]
+fn list_worktrees(state: State<'_, AppState>, id: String) -> Vec<cucina_core::Worktree> {
+    state
+        .sup
+        .get(&id)
+        .map(|s| cucina_core::git::worktrees(&s.dir))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn switch_worktree(app: AppHandle, id: String, path: String) -> Result<(), String> {
+    // Blocks while the old process is torn down.
+    let sup = app.state::<AppState>().sup.clone();
+    tauri::async_runtime::spawn_blocking(move || sup.switch_dir(&id, path.into()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn read_logs(state: State<'_, AppState>, id: String, tail: Option<usize>) -> Vec<LogLine> {
     state.sup.tail(&id, tail.unwrap_or(500))
@@ -268,6 +288,8 @@ pub fn run() {
             delete_server,
             list_groups,
             set_group_icon,
+            list_worktrees,
+            switch_worktree,
             read_logs,
             clear_logs,
             open_url,

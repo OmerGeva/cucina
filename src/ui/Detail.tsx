@@ -3,6 +3,7 @@ import { CaretLeft } from '@phosphor-icons/react'
 import type { LogLine, ServerView } from '../api'
 import { originLabel, shortenPath, uptime } from '../api'
 import { Chip } from './bits'
+import Worktrees from './Worktrees'
 
 interface Props {
   view: ServerView
@@ -17,6 +18,7 @@ interface Props {
   onOpenPort: (port: number) => void
   onReveal: () => void
   onClearLogs: () => void
+  onSwitched: () => void
 }
 
 export default function Detail({
@@ -32,6 +34,7 @@ export default function Detail({
   onOpenPort,
   onReveal,
   onClearLogs,
+  onSwitched,
 }: Props) {
   const { server, status } = view
   const live = status.state === 'running' || status.state === 'starting'
@@ -92,6 +95,12 @@ export default function Detail({
           <button className="path-btn" onClick={onReveal} title="Reveal in Finder">
             {shortenPath(server.dir, home)}
           </button>
+          <Worktrees
+            serverId={server.id}
+            dir={server.dir}
+            live={live}
+            onSwitched={onSwitched}
+          />
           <span className="sep">·</span>
           <span>{server.command}</span>
           {live && status.startedAt ? (

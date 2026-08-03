@@ -184,6 +184,7 @@ export default function App() {
             onClearLogs={() => {
               void api.clearLogs(current.server.id).then(() => setLines([]))
             }}
+            onSwitched={() => void refresh()}
           />
         ) : (
           <Home

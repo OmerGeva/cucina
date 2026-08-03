@@ -105,6 +105,12 @@ const LOGS: Record<string, LogLine[]> = {
 const RESPONSES: Record<string, unknown> = {
   list_servers: VIEWS,
   list_groups: [{ name: 'acme', icon: '🌿' }],
+  list_worktrees: [
+    { path: '/Users/omergeva/code/acme/acme-api', branch: 'feat-617-claim-scope-gate', isMain: true, isCurrent: false },
+    { path: '/x/feat-620-diagram-editor', branch: 'feat-620-diagram-editor', isMain: false, isCurrent: true },
+    { path: '/x/feat-542-document-rename', branch: 'feat-542-document-rename', isMain: false, isCurrent: false },
+    { path: '/x/feat-585-chem-bio-patent-foundation', branch: 'feat-585-chem-bio-patent-foundation', isMain: false, isCurrent: false },
+  ],
   home_dir: HOME,
   login_item_enabled: false,
   mcp_snippet: JSON.stringify(

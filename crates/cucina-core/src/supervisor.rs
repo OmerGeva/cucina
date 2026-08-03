@@ -660,6 +660,60 @@ impl Supervisor {
         Ok(())
     }
 
+    /// Point a server at a different directory — in practice, another git
+    /// worktree. A server left running from a directory you have navigated
+    /// away from is a trap, so a live one is stopped and started again in its
+    /// new home. One that was already idle stays idle.
+    pub fn switch_dir(self: &Arc<Self>, id: &str, dir: std::path::PathBuf) -> Result<(), String> {
+        let dir = paths::expand_tilde(&dir);
+        if !dir.is_dir() {
+            return Err(format!("{} is not a directory.", dir.display()));
+        }
+
+        let was_live = {
+            let rt = self.rt.lock().unwrap();
+            rt.get(id).is_some_and(|r| r.status.state.is_live())
+        };
+        if was_live {
+            self.stop(id)?;
+            self.await_settled(id);
+        }
+
+        {
+            let mut servers = self.servers.lock().unwrap();
+            let Some(server) = servers.iter_mut().find(|s| s.id == id) else {
+                return Err(format!("No server called {id}."));
+            };
+            if server.dir == dir {
+                return Ok(());
+            }
+            server.dir = dir;
+            let snapshot = servers.clone();
+            drop(servers);
+            self.persist(&snapshot)?;
+        }
+        self.emit(Event::ServersChanged);
+
+        if was_live {
+            self.start(id, Origin::User)?;
+        }
+        Ok(())
+    }
+
+    /// Wait for a stop to actually finish before reusing the slot.
+    fn await_settled(&self, id: &str) {
+        for _ in 0..80 {
+            thread::sleep(Duration::from_millis(100));
+            let done = {
+                let rt = self.rt.lock().unwrap();
+                rt.get(id).is_some_and(|r| !r.status.state.is_live())
+            };
+            if done {
+                return;
+            }
+        }
+    }
+
     pub fn restart(self: &Arc<Self>, id: &str, origin: Origin) -> Result<(), String> {
         let was_live = {
             let rt = self.rt.lock().unwrap();
@@ -667,17 +721,7 @@ impl Supervisor {
         };
         if was_live {
             self.stop(id)?;
-            // Wait for the monitor to settle before starting the next run.
-            for _ in 0..80 {
-                thread::sleep(Duration::from_millis(100));
-                let done = {
-                    let rt = self.rt.lock().unwrap();
-                    rt.get(id).is_some_and(|r| !r.status.state.is_live())
-                };
-                if done {
-                    break;
-                }
-            }
+            self.await_settled(id);
         }
         self.start(id, origin)
     }

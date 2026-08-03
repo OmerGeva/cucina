@@ -1589,3 +1589,126 @@ button {
   user-select: text;
   white-space: nowrap;
 }
+
+/* ---- worktree switcher -------------------------------------------------- */
+
+.worktree {
+  position: relative;
+  display: inline-flex;
+}
+
+.branch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--blue);
+  background: var(--blue-wash);
+  border-radius: 6px;
+  padding: 2px 7px;
+  max-width: 26ch;
+  transition:
+    background 120ms var(--ease-out),
+    box-shadow 120ms var(--ease-out);
+}
+
+.branch-btn svg {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  opacity: 0.7;
+}
+
+.branch-glyph {
+  opacity: 0.65;
+}
+
+.branch-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-btn:hover:not(:disabled),
+.branch-btn.open {
+  box-shadow: inset 0 0 0 1px rgba(61, 95, 138, 0.35);
+}
+
+.branch-btn:disabled {
+  opacity: 0.6;
+}
+
+.branch-menu {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--card-lift);
+  box-shadow: var(--shadow-3), inset 0 0 0 1px var(--line-firm);
+  transform-origin: top left;
+  animation: pop 130ms var(--ease-out);
+}
+
+.branch-note {
+  margin: 3px 8px 6px;
+  font-family: var(--ui);
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
+.branch-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  padding: 6px 9px;
+  border-radius: 6px;
+  transition: background 100ms var(--ease-out);
+}
+
+.branch-option-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch-option svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--blue);
+}
+
+.branch-option:hover {
+  background: var(--wash);
+}
+
+.branch-option.on {
+  color: var(--blue);
+}
+
+.branch-tag {
+  font-family: var(--ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a6410;
+  background: var(--butter-wash);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex: none;
+}

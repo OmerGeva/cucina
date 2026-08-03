@@ -34,6 +34,13 @@ export interface ServerView {
   status: Status
 }
 
+export interface Worktree {
+  path: string
+  branch: string
+  isMain: boolean
+  isCurrent: boolean
+}
+
 export interface Group {
   name: string
   icon: string
@@ -102,6 +109,9 @@ export const api = {
   save: (server: Server) => invoke<Server>('save_server', { server }),
   remove: (id: string) => invoke<void>('delete_server', { id }),
   groups: () => invoke<Group[]>('list_groups'),
+  worktrees: (id: string) => invoke<Worktree[]>('list_worktrees', { id }),
+  switchWorktree: (id: string, path: string) =>
+    invoke<void>('switch_worktree', { id, path }),
   setGroupIcon: (name: string, icon: string) =>
     invoke<void>('set_group_icon', { name, icon }),
   logs: (id: string, tail = 500) => invoke<LogLine[]>('read_logs', { id, tail }),
