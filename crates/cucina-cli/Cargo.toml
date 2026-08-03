@@ -1,0 +1,15 @@
+[package]
+name = "cucina-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cucina"
+path = "src/main.rs"
+
+[dependencies]
+cucina-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+libc.workspace = true

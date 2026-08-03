@@ -1,0 +1,10 @@
+# Build output
+/target
+/dist
+node_modules
+
+# Tauri generates these from tauri.conf.json and the capability files
+/src-tauri/gen
+
+# macOS
+.DS_Store
