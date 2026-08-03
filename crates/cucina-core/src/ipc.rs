@@ -15,7 +15,19 @@ use std::time::{Duration, Instant};
 /// away, and you can still stop it from the menu bar.
 pub fn serve(sup: Arc<Supervisor>) -> std::io::Result<()> {
     let path = paths::socket_path();
-    // A stale socket from a crash would block bind().
+
+    // If another Cucina is already answering here, this process must not take
+    // the socket from it. Unlinking a live socket orphans the running instance
+    // while leaving it on screen, which is how duplicate windows and duplicate
+    // menu bar icons appear.
+    if UnixStream::connect(&path).is_ok() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AddrInUse,
+            "another Cucina already owns the control socket",
+        ));
+    }
+
+    // Nothing answered, so any file here is stale from a crash.
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path)?;
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
@@ -89,6 +101,11 @@ fn await_ready(sup: &Arc<Supervisor>, id: &str, wait_ms: u64) -> Result<(), Stri
 fn dispatch(sup: &Arc<Supervisor>, req: Request) -> Response {
     match req {
         Request::Ping => Response::ok(serde_json::json!({ "app": "cucina" })),
+
+        Request::Show => {
+            sup.request_show();
+            Response::empty()
+        }
 
         Request::List => match serde_json::to_value(views(sup)) {
             Ok(v) => Response::ok(v),

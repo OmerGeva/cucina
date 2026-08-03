@@ -159,6 +159,8 @@ pub struct LogLine {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Event {
     Status(Status),
+    /// Someone tried to launch a second Cucina; raise the window we have.
+    Show,
     Log { id: String, lines: Vec<LogLine> },
     ServersChanged,
 }

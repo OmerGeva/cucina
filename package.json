@@ -1,7 +1,7 @@
 {
   "name": "cucina",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,7 @@
     "app": "npm run icons && tauri dev",
     "dist": "npm run icons && npm run cli:build && tauri build",
     "cli:build": "cargo build --release -p cucina-cli",
-    "cli:install": "npm run cli:build && mkdir -p ~/.local/bin && ln -sf \"$PWD/target/release/cucina\" ~/.local/bin/cucina && echo 'cucina installed to ~/.local/bin'",
+    "cli:install": "npm run cli:build && mkdir -p ~/.local/bin && ln -sf \"$PWD/target/release/cucina-cli\" ~/.local/bin/cucina && echo 'cucina installed to ~/.local/bin'",
     "fonts": "node scripts/fetch-fonts.mjs",
     "icons:app": "tauri icon assets/icon-source.png"
   },

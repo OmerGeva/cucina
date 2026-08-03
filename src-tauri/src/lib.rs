@@ -147,17 +147,17 @@ fn find_cli_binary(app: &AppHandle) -> Option<std::path::PathBuf> {
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            candidates.push(dir.join("cucina"));
+            candidates.push(dir.join("cucina-cli"));
         }
     }
     if let Ok(dir) = app.path().resource_dir() {
-        candidates.push(dir.join("cucina"));
+        candidates.push(dir.join("cucina-cli"));
     }
     // Development: the workspace target directory sits next to this crate.
     if let Some(manifest) = option_env!("CARGO_MANIFEST_DIR") {
         let root = std::path::Path::new(manifest).parent()?;
-        candidates.push(root.join("target/release/cucina"));
-        candidates.push(root.join("target/debug/cucina"));
+        candidates.push(root.join("target/release/cucina-cli"));
+        candidates.push(root.join("target/debug/cucina-cli"));
     }
     candidates.into_iter().find(|p| p.is_file())
 }
@@ -198,6 +198,13 @@ fn mcp_snippet(app: AppHandle) -> String {
     .unwrap_or_default()
 }
 
+/// The version from tauri.conf.json, so Settings reports what is actually
+/// installed rather than whatever the frontend was compiled against.
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
 #[tauri::command]
 fn home_dir() -> String {
     paths::home().display().to_string()
@@ -229,6 +236,17 @@ fn ensure_ticker(app: &AppHandle, sup: &Arc<Supervisor>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Single instance. Launching Cucina again — by hand, from the Dock, or via
+    // `open -ga Cucina` in the CLI's connect-or-launch path — should raise the
+    // window we already have rather than start a rival that shows its own
+    // window and its own menu bar icon.
+    if ipc::already_running() {
+        if let Ok(mut client) = cucina_core::client::Client::connect() {
+            let _ = client.request(&cucina_core::proto::Request::Show);
+        }
+        return;
+    }
+
     let sup = Supervisor::new();
 
     tauri::Builder::default()
@@ -259,9 +277,13 @@ pub fn run() {
             set_login_item,
             install_cli,
             mcp_snippet,
+            app_version,
             home_dir,
         ])
         .setup(move |app| {
+            // Costs a full interactive shell; do it before anything needs it.
+            paths::warm_login_path();
+
             let handle = app.handle().clone();
             let sup = handle.state::<AppState>().sup.clone();
 
@@ -270,7 +292,13 @@ pub fn run() {
 
             // The socket is what lets the CLI and MCP server drive this app.
             if let Err(e) = ipc::serve(sup.clone()) {
+                // Losing the race for the socket means another Cucina got
+                // there first; step aside rather than run half-connected.
                 eprintln!("cucina: couldn't open the control socket: {e}");
+                if e.kind() == std::io::ErrorKind::AddrInUse {
+                    handle.exit(0);
+                    return Ok(());
+                }
             }
 
             // Fan supervisor events out to the UI and the menu bar.
@@ -278,6 +306,8 @@ pub fn run() {
             let event_handle = handle.clone();
             sup.subscribe(Box::new(move |ev| {
                 match &ev {
+                    // A second launch asked us to come forward.
+                    Event::Show => show_main_window(&event_handle),
                     // Log traffic is the chatty one: skip it entirely while the
                     // window is hidden. The ring buffer still has it when the
                     // window comes back.

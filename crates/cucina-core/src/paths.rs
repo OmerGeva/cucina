@@ -1,4 +1,6 @@
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 
 pub fn home() -> PathBuf {
     std::env::var_os("HOME")
@@ -51,6 +53,47 @@ pub fn contract_tilde(p: &Path) -> String {
 ///
 /// The wrapper we generate is POSIX shell, so a non-POSIX login shell (fish,
 /// nushell) falls back to zsh rather than failing to parse.
+/// The PATH a Terminal window would have.
+///
+/// An app launched from Finder inherits launchd's bare environment, and a
+/// *non-interactive* login shell does not read ~/.zshrc — which is exactly
+/// where nvm, asdf and mise install themselves. So resolve the value from a
+/// fully interactive shell once, and hand it to every server we spawn.
+///
+/// The value is fenced by markers because an interactive startup file may
+/// print banners of its own (ssh-agent, version managers, MOTD) and none of
+/// that is PATH.
+pub fn login_path() -> Option<&'static str> {
+    static PATH: OnceLock<Option<String>> = OnceLock::new();
+    PATH.get_or_init(resolve_login_path).as_deref()
+}
+
+fn resolve_login_path() -> Option<String> {
+    const OPEN: &str = "__cucina_path(";
+    const CLOSE: &str = ")cucina_path__";
+
+    let output = Command::new(login_shell())
+        .args(["-ilc", &format!("printf '{OPEN}%s{CLOSE}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let start = text.find(OPEN)? + OPEN.len();
+    let end = start + text[start..].find(CLOSE)?;
+    let path = text[start..end].trim();
+    (!path.is_empty()).then(|| path.to_string())
+}
+
+/// Resolving costs a full interactive shell startup, so warm it off the hot
+/// path rather than paying for it on the first server the user starts.
+pub fn warm_login_path() {
+    std::thread::spawn(|| {
+        let _ = login_path();
+    });
+}
+
 pub fn login_shell() -> String {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let name = Path::new(&shell)

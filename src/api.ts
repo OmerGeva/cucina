@@ -50,6 +50,7 @@ export type CucinaEvent =
   | ({ type: 'status' } & Status)
   | { type: 'log'; id: string; lines: LogLine[] }
   | { type: 'serversChanged' }
+  | { type: 'show' }
 
 export const blankServer = (): Server => ({
   id: '',
@@ -113,6 +114,7 @@ export const api = {
   installCli: () => invoke<string>('install_cli'),
   mcpSnippet: () => invoke<string>('mcp_snippet'),
   homeDir: () => invoke<string>('home_dir'),
+  version: () => invoke<string>('app_version'),
 }
 
 export const onEvent = (handler: (event: CucinaEvent) => void) =>

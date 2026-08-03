@@ -140,6 +140,11 @@ impl Supervisor {
         }
     }
 
+    /// Ask the app to bring its window forward.
+    pub fn request_show(&self) {
+        self.emit(Event::Show);
+    }
+
     fn emit_status(&self, id: &str) {
         let status = self.rt.lock().unwrap().get(id).map(|r| r.status.clone());
         if let Some(status) = status {
@@ -373,6 +378,11 @@ impl Supervisor {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        // Without this, a Finder-launched Cucina has only launchd's bare PATH
+        // and commands like `npm` are simply not found.
+        if let Some(path) = paths::login_path() {
+            cmd.env("PATH", path);
+        }
         for (k, v) in &server.env {
             cmd.env(k, v);
         }

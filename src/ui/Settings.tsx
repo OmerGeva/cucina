@@ -8,10 +8,12 @@ export default function Settings() {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [version, setVersion] = useState('')
 
   useEffect(() => {
     void api.loginItem().then(setAtLogin)
     void api.mcpSnippet().then(setSnippet)
+    void api.version().then(setVersion)
   }, [])
 
   const toggleLogin = async (next: boolean) => {
@@ -51,6 +53,16 @@ export default function Settings() {
       </div>
 
       {error ? <div className="error" style={{ marginBottom: 18 }}>{error}</div> : null}
+
+      <section className="panel">
+        <div className="panel-row">
+          <div>
+            <h2 className="panel-title">Cucina</h2>
+            <p className="prose">Keep your local servers on the heat.</p>
+          </div>
+          <span className="version">{version ? `v${version}` : ''}</span>
+        </div>
+      </section>
 
       <section className="panel">
         <h2 className="panel-title">Startup</h2>

@@ -4,8 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+# Named cucina-cli, not cucina: macOS filesystems are case-insensitive, so a
+# binary called `cucina` and the app's `Cucina` are the same path in target/
+# and would overwrite each other. It installs as `cucina`.
 [[bin]]
-name = "cucina"
+name = "cucina-cli"
 path = "src/main.rs"
 
 [dependencies]

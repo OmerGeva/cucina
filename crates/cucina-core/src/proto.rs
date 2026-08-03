@@ -13,6 +13,8 @@ pub struct ServerView {
 #[serde(tag = "op", rename_all = "camelCase")]
 pub enum Request {
     Ping,
+    /// Bring the existing window forward.
+    Show,
     List,
     Start {
         id: String,
