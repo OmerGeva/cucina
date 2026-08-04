@@ -45,6 +45,11 @@ pub enum Request {
     Remove {
         id: String,
     },
+    /// Point a server at another directory, restarting it there if it was up.
+    Switch {
+        id: String,
+        path: String,
+    },
 }
 
 impl Origin {

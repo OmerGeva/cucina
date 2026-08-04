@@ -147,6 +147,11 @@ fn dispatch(sup: &Arc<Supervisor>, req: Request) -> Response {
             Ok(()) => Response::empty(),
             Err(e) => Response::err(e),
         },
+
+        Request::Switch { id, path } => match sup.switch_dir(&id, path.into()) {
+            Ok(()) => finish(sup, &id, None),
+            Err(e) => Response::err(e),
+        },
     }
 }
 

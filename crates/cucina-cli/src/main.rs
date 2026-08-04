@@ -228,6 +228,60 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
             println!("  {} {id} removed", paint.dim("−"));
             Ok(())
         }
+        "worktrees" | "wt" => {
+            let key = need_id(args)?;
+            let mut c = Client::connect_or_launch()?;
+            let views = c.request(&Request::List)?.views();
+            let view = views
+                .iter()
+                .find(|v| v.server.id == key || v.server.name.to_lowercase() == key.to_lowercase())
+                .ok_or_else(|| format!("No server called {key}."))?;
+            let trees = cucina_core::git::worktrees(&view.server.dir);
+            if trees.is_empty() {
+                return Err(format!("{} isn't a git worktree.", view.server.dir.display()));
+            }
+            if args.has("json") {
+                println!("{}", serde_json::to_string_pretty(&trees).unwrap_or_default());
+            } else {
+                for tree in &trees {
+                    let mark = if tree.is_current { paint.green("●") } else { paint.dim("○") };
+                    let tag = if tree.is_main { paint.dim("  base") } else { String::new() };
+                    println!("  {mark}  {}{tag}", paint.bold(&tree.branch));
+                }
+            }
+            Ok(())
+        }
+        "switch" => {
+            let key = need_id(args)?;
+            let target = args
+                .positional
+                .get(1)
+                .ok_or("Which worktree? e.g. `cucina switch api feat-620-diagram-editor`")?;
+            let mut c = Client::connect_or_launch()?;
+            let views = c.request(&Request::List)?.views();
+            let view = views
+                .iter()
+                .find(|v| v.server.id == key || v.server.name.to_lowercase() == key.to_lowercase())
+                .ok_or_else(|| format!("No server called {key}."))?;
+            let was_live = view.status.state.is_live();
+            let tree = resolve_worktree(&view.server.dir, target)?;
+            let res = c.request(&Request::Switch {
+                id: view.server.id.clone(),
+                path: tree.path.to_string_lossy().to_string(),
+            })?;
+            if args.has("json") {
+                println!("{}", serde_json::to_string_pretty(&res.data).unwrap_or_default());
+            } else {
+                println!(
+                    "  {} {} now on {}{}",
+                    paint.terracotta("⎇"),
+                    view.server.id,
+                    paint.bold(&tree.branch),
+                    if was_live { " — restarted" } else { "" }
+                );
+            }
+            Ok(())
+        }
         "open" => {
             let id = need_id(args)?;
             let mut c = Client::connect_or_launch()?;
@@ -257,6 +311,39 @@ fn need_id(args: &Args) -> Result<String, String> {
         .first()
         .cloned()
         .ok_or_else(|| "Which server? e.g. `cucina up api`".to_string())
+}
+
+/// Resolve a worktree by branch name, or by a path that ends with what the
+/// user typed. Listing git is the CLI's own business — only the switch itself
+/// has to go through the app.
+fn resolve_worktree(
+    dir: &std::path::Path,
+    target: &str,
+) -> Result<cucina_core::git::Worktree, String> {
+    let trees = cucina_core::git::worktrees(dir);
+    if trees.is_empty() {
+        return Err(format!("{} isn't a git worktree.", dir.display()));
+    }
+    let lowered = target.to_lowercase();
+    let found = trees
+        .iter()
+        .find(|w| w.branch.to_lowercase() == lowered)
+        .or_else(|| {
+            trees
+                .iter()
+                .find(|w| w.path.to_string_lossy().to_lowercase().ends_with(&lowered))
+        });
+    match found {
+        Some(w) => Ok(w.clone()),
+        None => Err(format!(
+            "No worktree matching `{target}`. Available:\n  {}",
+            trees
+                .iter()
+                .map(|w| w.branch.as_str())
+                .collect::<Vec<_>>()
+                .join("\n  ")
+        )),
+    }
 }
 
 /// A name can mean one server or a whole group — `cucina up acme` should
@@ -349,6 +436,8 @@ fn help(paint: &Paint) -> String {
         (format!("{} {}", b("cucina restart"), d("<id>")), d("stop and start again")),
         (format!("{} {}", b("cucina logs"), d("<id>")), d("recent output, --tail N")),
         (format!("{} {}", b("cucina open"), d("<id>")), d("open it in the browser")),
+        (format!("{} {}", b("cucina worktrees"), d("<id>")), d("git worktrees it can run from")),
+        (format!("{} {}", b("cucina switch"), d("<id> <branch>")), d("move it to another worktree")),
         (b("cucina add"), d("--name api --dir . --command \"npm run dev\"")),
         (format!("{} {}", b("cucina rm"), d("<id>")), d("remove one")),
         (b("cucina mcp"), d("run as an MCP server for coding agents")),

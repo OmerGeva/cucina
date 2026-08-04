@@ -134,6 +134,35 @@ fn tools() -> Value {
             }
         },
         {
+            "name": "cucina_worktrees",
+            "description": "List the git worktrees a server can run from, with the branch name of each, which one is the repository's main worktree, and which one the server currently points at. Use this to find out where a server is running before switching it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "id": id_arg },
+                "required": ["id"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_switch",
+            "description": "Point a server at a different git worktree, given a branch name. If the server is running it is stopped and started again in the new worktree, because a server still running from a directory you have moved away from is misleading. Does not accept a group.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The server's id, as shown by cucina_list."
+                    },
+                    "worktree": {
+                        "type": "string",
+                        "description": "Branch name of the target worktree, as shown by cucina_worktrees."
+                    }
+                },
+                "required": ["id", "worktree"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "cucina_logs",
             "description": "Read a server's recent stdout and stderr. Use this to diagnose why something failed to start or is returning errors.",
             "inputSchema": {
@@ -246,6 +275,47 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 }
             }
             Ok(out.join("\n"))
+        }
+        "cucina_worktrees" => {
+            let id = arg_id(args)?;
+            let views = c.request(&Request::List)?.views();
+            let view = views
+                .iter()
+                .find(|v| v.server.id == id)
+                .ok_or_else(|| format!("No server called {id}."))?;
+            let trees = cucina_core::git::worktrees(&view.server.dir);
+            if trees.is_empty() {
+                return Ok(format!("{id} is not in a git worktree ({}).", view.server.dir.display()));
+            }
+            Ok(pretty(&serde_json::to_value(trees).unwrap_or_default()))
+        }
+        "cucina_switch" => {
+            let id = arg_id(args)?;
+            let target = args
+                .get("worktree")
+                .and_then(Value::as_str)
+                .ok_or("A worktree branch name is required. Call cucina_worktrees to see them.")?;
+            let views = c.request(&Request::List)?.views();
+            let view = views
+                .iter()
+                .find(|v| v.server.id == id)
+                .ok_or_else(|| format!("No server called {id}."))?;
+            let trees = cucina_core::git::worktrees(&view.server.dir);
+            let lowered = target.to_lowercase();
+            let tree = trees
+                .iter()
+                .find(|w| w.branch.to_lowercase() == lowered)
+                .ok_or_else(|| {
+                    format!(
+                        "No worktree called {target}. Available: {}",
+                        trees.iter().map(|w| w.branch.as_str()).collect::<Vec<_>>().join(", ")
+                    )
+                })?;
+            let res = c.request(&Request::Switch {
+                id: id.clone(),
+                path: tree.path.to_string_lossy().to_string(),
+            })?;
+            Ok(pretty(&res.data))
         }
         "cucina_logs" => {
             let id = arg_id(args)?;
