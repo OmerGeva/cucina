@@ -74,5 +74,72 @@ pub fn worktrees(dir: &Path) -> Vec<Worktree> {
             }
         }
     }
+    // Git lists in its own order, which is unscannable once a repo has a dozen
+    // worktrees. Sort the rest the way a person reads them, and keep the main
+    // worktree pinned at the top as the anchor to return to.
+    let main = if found.is_empty() { None } else { Some(found.remove(0)) };
+    found.sort_by(|a, b| natural_cmp(&a.branch, &b.branch));
+    if let Some(main) = main {
+        found.insert(0, main);
+    }
     found
+}
+
+/// Compare the way a person reads: runs of digits compare numerically, so
+/// feat-64 sorts before feat-522 rather than after it.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let (mut i, mut j) = (0, 0);
+
+    while i < a.len() && j < b.len() {
+        if a[i].is_ascii_digit() && b[j].is_ascii_digit() {
+            let start_a = i;
+            let start_b = j;
+            while i < a.len() && a[i].is_ascii_digit() {
+                i += 1;
+            }
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            // Compare by value, falling back to text for numbers too long to fit.
+            let na = std::str::from_utf8(&a[start_a..i]).unwrap_or("").parse::<u128>();
+            let nb = std::str::from_utf8(&b[start_b..j]).unwrap_or("").parse::<u128>();
+            match (na, nb) {
+                (Ok(x), Ok(y)) if x != y => return x.cmp(&y),
+                (Ok(_), Ok(_)) => {}
+                _ => return a[start_a..i].cmp(&b[start_b..j]),
+            }
+        } else {
+            let (x, y) = (a[i].to_ascii_lowercase(), b[j].to_ascii_lowercase());
+            if x != y {
+                return x.cmp(&y);
+            }
+            i += 1;
+            j += 1;
+        }
+    }
+    match (a.len() - i, b.len() - j) {
+        (0, 0) => Ordering::Equal,
+        (0, _) => Ordering::Less,
+        _ => Ordering::Greater,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::natural_cmp;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn digit_runs_compare_by_value() {
+        assert_eq!(natural_cmp("feat-64-a", "feat-522-a"), Ordering::Less);
+        assert_eq!(natural_cmp("feat-617-x", "feat-585-y"), Ordering::Greater);
+    }
+
+    #[test]
+    fn text_compares_case_insensitively() {
+        assert_eq!(natural_cmp("feat-agent", "feat-464"), Ordering::Greater);
+        assert_eq!(natural_cmp("main", "MAIN"), Ordering::Equal);
+    }
 }

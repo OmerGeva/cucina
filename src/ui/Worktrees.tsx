@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { CaretDown, Check } from '@phosphor-icons/react'
 import type { Worktree } from '../api'
 import { api } from '../api'
@@ -17,7 +18,30 @@ export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
   const [trees, setTrees] = useState<Worktree[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  /** Fixed coordinates, clamped to the window — the trigger can sit anywhere
+      along a path of any length, so a menu anchored to it will otherwise run
+      off the edge. */
+  const [box, setBox] = useState<CSSProperties>({})
   const root = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+
+  const MENU_W = 300
+  const EDGE = 10
+
+  const place = () => {
+    const r = trigger.current?.getBoundingClientRect()
+    if (!r) return
+    const left = Math.min(Math.max(EDGE, r.left), window.innerWidth - MENU_W - EDGE)
+    const below = window.innerHeight - r.bottom - EDGE - 6
+    const above = r.top - EDGE - 6
+    // Prefer dropping down, but flip up when there is meaningfully more room.
+    const drop = below >= 180 || below >= above
+    setBox(
+      drop
+        ? { left, top: r.bottom + 6, maxHeight: Math.max(140, below) }
+        : { left, bottom: window.innerHeight - r.top + 6, maxHeight: Math.max(140, above) },
+    )
+  }
 
   useEffect(() => {
     let stale = false
@@ -40,9 +64,14 @@ export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
         setOpen(false)
       }
     }
+    // Keep it anchored if the window moves or resizes under it.
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', esc, true)
     return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
       document.removeEventListener('mousedown', away)
       document.removeEventListener('keydown', esc, true)
     }
@@ -72,8 +101,12 @@ export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
   return (
     <div className="worktree" ref={root}>
       <button
+        ref={trigger}
         className={`branch-btn${open ? ' open' : ''}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) place()
+          setOpen((o) => !o)
+        }}
         disabled={busy}
         title={live ? 'Switch worktree — restarts the server there' : 'Switch worktree'}
       >
@@ -83,7 +116,7 @@ export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
       </button>
 
       {open ? (
-        <div className="branch-menu" role="listbox">
+        <div className="branch-menu" role="listbox" style={box}>
           {live ? <p className="branch-note">Switching restarts the server there.</p> : null}
           {trees.map((tree) => (
             <button
