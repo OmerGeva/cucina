@@ -32,6 +32,12 @@ jobs:
 
       - run: npm ci
 
+      # The app bundles the CLI as a resource, and tauri-build validates that
+      # path exists — so this has to be built before anything compiles the
+      # app, including a plain clippy run.
+      - name: Build the CLI (bundled into the app)
+        run: cargo build --release -p cucina-cli
+
       # tsc --noEmit && vite build
       - name: Frontend
         run: npm run build
