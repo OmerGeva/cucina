@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="880" viewBox="0 0 700 440">
+  <title>Cucina — DMG background (6a Sunset)</title>
+  <defs>
+    <clipPath id="band"><rect x="330" y="0" width="370" height="162"></rect></clipPath>
+    <clipPath id="above"><rect x="0" y="0" width="700" height="167"></rect></clipPath>
+  </defs>
+  <rect width="700" height="440" fill="#f7f4ec"></rect>
+  <rect x="330" y="0" width="370" height="162" fill="#f2eee4"></rect>
+  <g clip-path="url(#band)" fill="#1a1815" opacity="0.45">
+    <rect x="330" y="0" width="1.5" height="162"></rect>
+    <rect x="339" y="0" width="1.5" height="162"></rect>
+    <rect x="348" y="0" width="1.5" height="162"></rect>
+    <rect x="357" y="0" width="1.5" height="162"></rect>
+    <rect x="366" y="0" width="1.5" height="162"></rect>
+    <rect x="375" y="0" width="1.5" height="162"></rect>
+    <rect x="384" y="0" width="1.5" height="162"></rect>
+    <rect x="393" y="0" width="1.5" height="162"></rect>
+    <rect x="402" y="0" width="1.5" height="162"></rect>
+    <rect x="411" y="0" width="1.5" height="162"></rect>
+    <rect x="420" y="0" width="1.5" height="162"></rect>
+    <rect x="429" y="0" width="1.5" height="162"></rect>
+    <rect x="438" y="0" width="1.5" height="162"></rect>
+    <rect x="447" y="0" width="1.5" height="162"></rect>
+    <rect x="456" y="0" width="1.5" height="162"></rect>
+    <rect x="465" y="0" width="1.5" height="162"></rect>
+    <rect x="474" y="0" width="1.5" height="162"></rect>
+    <rect x="483" y="0" width="1.5" height="162"></rect>
+    <rect x="492" y="0" width="1.5" height="162"></rect>
+    <rect x="501" y="0" width="1.5" height="162"></rect>
+    <rect x="510" y="0" width="1.5" height="162"></rect>
+    <rect x="519" y="0" width="1.5" height="162"></rect>
+    <rect x="528" y="0" width="1.5" height="162"></rect>
+    <rect x="537" y="0" width="1.5" height="162"></rect>
+    <rect x="546" y="0" width="1.5" height="162"></rect>
+    <rect x="555" y="0" width="1.5" height="162"></rect>
+    <rect x="564" y="0" width="1.5" height="162"></rect>
+    <rect x="573" y="0" width="1.5" height="162"></rect>
+    <rect x="582" y="0" width="1.5" height="162"></rect>
+    <rect x="591" y="0" width="1.5" height="162"></rect>
+    <rect x="600" y="0" width="1.5" height="162"></rect>
+    <rect x="609" y="0" width="1.5" height="162"></rect>
+    <rect x="618" y="0" width="1.5" height="162"></rect>
+    <rect x="627" y="0" width="1.5" height="162"></rect>
+    <rect x="636" y="0" width="1.5" height="162"></rect>
+    <rect x="645" y="0" width="1.5" height="162"></rect>
+    <rect x="654" y="0" width="1.5" height="162"></rect>
+    <rect x="663" y="0" width="1.5" height="162"></rect>
+    <rect x="672" y="0" width="1.5" height="162"></rect>
+    <rect x="681" y="0" width="1.5" height="162"></rect>
+    <rect x="690" y="0" width="1.5" height="162"></rect>
+    <rect x="699" y="0" width="1.5" height="162"></rect>
+  </g>
+  <g clip-path="url(#above)"><circle cx="520" cy="122" r="58" fill="#e8402a"></circle></g>
+  <rect x="0" y="162" width="700" height="5" fill="#1a1815"></rect>
+  <text x="46" y="94" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="-2.43" fill="#1a1815">Cucina</text>
+  <text x="46" y="126" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="10" letter-spacing="2.4" fill="#1a1815" opacity="0.45">LOCAL SERVERS, ON THE HEAT</text>
+  <rect x="300" y="261" width="89" height="2" fill="#e8402a"></rect>
+  <polygon points="389,255 400,262 389,269" fill="#e8402a"></polygon>
+</svg>

@@ -43,7 +43,22 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "dmg": {
+        "background": "dmg/background.png",
+        "windowSize": {
+          "width": 700,
+          "height": 440
+        },
+        "appPosition": {
+          "x": 215,
+          "y": 268
+        },
+        "applicationFolderPosition": {
+          "x": 505,
+          "y": 268
+        }
+      }
     },
     "resources": {
       "../target/release/cucina-cli": "cucina-cli"
