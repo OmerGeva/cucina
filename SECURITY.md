@@ -2,9 +2,10 @@
 
 ## Reporting a vulnerability
 
-Please report privately rather than opening a public issue: use
-[GitHub's private advisory form](https://github.com/omergeva/cucina/security/advisories/new),
-or email **54701359+OmerGeva@users.noreply.github.com**.
+Please report privately rather than opening a public issue, using
+[GitHub's private advisory form](https://github.com/omergeva/cucina/security/advisories/new).
+That reaches the maintainer directly and keeps the report confidential until
+there is a fix to publish.
 
 This is a personal project maintained in spare time. I will acknowledge reports as quickly
 as I can, but cannot promise a fixed response window.

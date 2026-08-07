@@ -34,9 +34,11 @@ Examples of unacceptable behaviour:
 
 ## Enforcement
 
-Instances of abusive, harassing or otherwise unacceptable behaviour may be reported to the
-maintainer at **54701359+OmerGeva@users.noreply.github.com**. All complaints will be reviewed and investigated
-promptly and fairly, and the privacy and security of the reporter will be respected.
+Instances of abusive, harassing or otherwise unacceptable behaviour may be reported
+privately to the maintainer through
+[GitHub's private reporting form](https://github.com/omergeva/cucina/security/advisories/new),
+which is confidential. All complaints will be reviewed and investigated promptly and
+fairly, and the privacy and security of the reporter will be respected.
 
 Maintainers are responsible for clarifying and enforcing these standards, and may remove,
 edit or reject comments, commits, code, issues and other contributions that are not aligned
