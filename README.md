@@ -55,17 +55,22 @@ tree and takes a few minutes; later ones take seconds.
 ### Download the DMG
 
 Grab the latest `.dmg` from [Releases](https://github.com/omergeva/cucina/releases), open
-it, drag Cucina to Applications — then **clear the quarantine flag**, or macOS will report
-the app as damaged and refuse to open it:
+it and drag Cucina to Applications. macOS will then refuse to open it, with:
+
+> **"Cucina" is damaged and can't be opened. You should move it to the Trash.**
+
+Nothing is damaged, and the download is fine. Clear the quarantine flag and it opens
+normally:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Cucina.app
 ```
 
-That command is not a workaround for something being wrong with the app. Distributing a Mac
-app outside the App Store without that warning requires an Apple Developer ID, which is a
-paid Apple account; this project does not have one, so the build is ad-hoc signed and macOS
-treats it as untrusted. You are extending trust to the build either way, which is a good
+That message is macOS being misleading. Gatekeeper says "damaged" for any app it cannot
+verify, which is indistinguishable from what it says about a genuinely corrupt one.
+Distributing a Mac app outside the App Store without that warning requires an Apple
+Developer ID — a paid Apple account this project does not have — so the build is ad-hoc
+signed and treated as untrusted. You are extending trust to the build either way, which is a good
 reason to prefer compiling it yourself.
 
 Homebrew would not avoid this — a cask of an unsigned app still needs `--no-quarantine` — so
