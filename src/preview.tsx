@@ -24,7 +24,7 @@ const server = (
 const VIEWS: ServerView[] = [
   {
     server: server('docs', 'Docs', `${HOME}/code/docs`, 'python3 -m http.server 8931', ''),
-    status: { id: 'demo', state: 'stopped', restarts: 0 },
+    status: { id: 'docs', state: 'stopped', restarts: 0 },
   },
   {
     server: server(
@@ -53,7 +53,7 @@ const VIEWS: ServerView[] = [
       'acme',
     ),
     status: {
-      id: 'acme-data-service',
+      id: 'data-service',
       state: 'running',
       pid: 4712,
       port: 8000,
@@ -70,7 +70,7 @@ const VIEWS: ServerView[] = [
       'make start',
       'acme',
     ),
-    status: { id: 'acme-fe', state: 'starting', pid: 4713, startedAt: since(0), restarts: 0 },
+    status: { id: 'web', state: 'starting', pid: 4713, startedAt: since(0), restarts: 0 },
   },
   {
     server: server('cms', 'CMS', `${HOME}/code/acme/cms`, 'npm run dev', 'acme'),

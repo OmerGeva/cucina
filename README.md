@@ -80,6 +80,8 @@ there is no tap for now.
 3. Press start. The port appears on the card once the server is actually listening; click
    it to open the browser.
 
+![Adding a server](docs/add.png)
+
 The menu bar shows what is running and starts or stops anything in one click. Closing the
 window leaves your servers running; quitting Cucina stops them.
 
@@ -101,6 +103,8 @@ cucina switch api main      # move it to another worktree, restarting if it's up
 
 Any id also accepts a project name, so one call brings a whole stack up.
 
+![Settings](docs/settings.png)
+
 ## Coding agents (MCP)
 
 Settings → Agents → **Copy config** gives you the snippet. For Claude Code:
@@ -121,6 +125,8 @@ Seven tools: `cucina_list`, `cucina_start`, `cucina_stop`, `cucina_restart`,
 the port is actually listening, so an agent can start a server and immediately curl it.
 
 ![A server and its log](docs/detail.png)
+
+A server's own screen: where it runs, which worktree it is on, and its output.
 
 ## How it works
 
