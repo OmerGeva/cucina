@@ -23,7 +23,10 @@ pub fn run() {
         let Ok(msg) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
-        let method = msg.get("method").and_then(Value::as_str).unwrap_or_default();
+        let method = msg
+            .get("method")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let params = msg.get("params").cloned().unwrap_or(Value::Null);
 
         // No id means it's a notification: act on it, but stay silent.
@@ -59,8 +62,8 @@ fn handle(method: &str, params: &Value) -> Result<Value, (i32, String)> {
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "cucina", "version": env!("CARGO_PKG_VERSION") },
                 "instructions": "Cucina supervises long-running local dev servers. \
-Start one and it keeps running after you finish — you do not need to hold a background \
-process open or remember to kill it, and the user can stop it from the menu bar."
+            Start one and it keeps running after you finish — you do not need to hold a background \
+            process open or remember to kill it, and the user can stop it from the menu bar."
             }))
         }
         "ping" => Ok(json!({})),
@@ -216,7 +219,9 @@ fn resolve(c: &mut Client, key: &str) -> Result<Vec<String>, String> {
             .map(|v| v.server.id.as_str())
             .collect::<Vec<_>>()
             .join(", ");
-        return Err(format!("No server or group called {key}. Known ids: {known}"));
+        return Err(format!(
+            "No server or group called {key}. Known ids: {known}"
+        ));
     }
     Ok(group)
 }
@@ -228,7 +233,9 @@ fn wait_ms(args: &Value) -> Option<u64> {
 
 fn call(name: &str, args: &Value) -> Result<String, String> {
     let mut c = Client::connect_or_launch()?;
-    let origin = Origin::Agent { client: client_name() };
+    let origin = Origin::Agent {
+        client: client_name(),
+    };
 
     let pretty = |v: &Value| serde_json::to_string_pretty(v).unwrap_or_else(|_| v.to_string());
 
@@ -285,7 +292,10 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 .ok_or_else(|| format!("No server called {id}."))?;
             let trees = cucina_core::git::worktrees(&view.server.dir);
             if trees.is_empty() {
-                return Ok(format!("{id} is not in a git worktree ({}).", view.server.dir.display()));
+                return Ok(format!(
+                    "{id} is not in a git worktree ({}).",
+                    view.server.dir.display()
+                ));
             }
             Ok(pretty(&serde_json::to_value(trees).unwrap_or_default()))
         }
@@ -308,7 +318,11 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 .ok_or_else(|| {
                     format!(
                         "No worktree called {target}. Available: {}",
-                        trees.iter().map(|w| w.branch.as_str()).collect::<Vec<_>>().join(", ")
+                        trees
+                            .iter()
+                            .map(|w| w.branch.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     )
                 })?;
             let res = c.request(&Request::Switch {
@@ -324,7 +338,10 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 .and_then(Value::as_u64)
                 .map(|n| n as usize)
                 .unwrap_or(200);
-            let res = c.request(&Request::Logs { id: id.clone(), tail: Some(tail) })?;
+            let res = c.request(&Request::Logs {
+                id: id.clone(),
+                tail: Some(tail),
+            })?;
             let lines = res.lines();
             if lines.is_empty() {
                 return Ok(format!("{id} has produced no output."));

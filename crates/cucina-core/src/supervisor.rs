@@ -203,7 +203,12 @@ impl Supervisor {
     }
 
     pub fn get(&self, id: &str) -> Option<Server> {
-        self.servers.lock().unwrap().iter().find(|s| s.id == id).cloned()
+        self.servers
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| s.id == id)
+            .cloned()
     }
 
     pub fn statuses(&self) -> Vec<Status> {
@@ -360,7 +365,12 @@ impl Supervisor {
         self.spawn(&server, origin, 0)
     }
 
-    fn spawn(self: &Arc<Self>, server: &Server, origin: Origin, restarts: u32) -> Result<(), String> {
+    fn spawn(
+        self: &Arc<Self>,
+        server: &Server,
+        origin: Origin,
+        restarts: u32,
+    ) -> Result<(), String> {
         let dir = paths::expand_tilde(&server.dir);
         if !dir.is_dir() {
             return Err(format!("{} no longer exists.", dir.display()));
@@ -414,7 +424,9 @@ impl Supervisor {
         let pgid = pid as i32;
         let generation = {
             let mut rt = self.rt.lock().unwrap();
-            let entry = rt.entry(server.id.clone()).or_insert_with(|| Runtime::new(&server.id));
+            let entry = rt
+                .entry(server.id.clone())
+                .or_insert_with(|| Runtime::new(&server.id));
             entry.generation += 1;
             entry.stopping = false;
             entry.pgid = Some(pgid);
@@ -553,7 +565,13 @@ impl Supervisor {
     }
 
     /// Reap the child and decide whether to bring it back.
-    fn monitor(self: &Arc<Self>, server: Server, mut child: Child, generation: u64, origin: Origin) {
+    fn monitor(
+        self: &Arc<Self>,
+        server: Server,
+        mut child: Child,
+        generation: u64,
+        origin: Origin,
+    ) {
         let sup = self.clone();
         thread::spawn(move || {
             let status = child.wait();
@@ -563,7 +581,9 @@ impl Supervisor {
             let mut restarts = 0;
             {
                 let mut rt = sup.rt.lock().unwrap();
-                let Some(r) = rt.get_mut(&server.id) else { return };
+                let Some(r) = rt.get_mut(&server.id) else {
+                    return;
+                };
                 if r.generation != generation {
                     return; // superseded by a newer run
                 }
@@ -602,7 +622,11 @@ impl Supervisor {
 
             match code {
                 Some(0) => sup.log(&server.id, Stream::System, "Finished cleanly."),
-                Some(c) => sup.log(&server.id, Stream::System, &format!("Exited with code {c}.")),
+                Some(c) => sup.log(
+                    &server.id,
+                    Stream::System,
+                    &format!("Exited with code {c}."),
+                ),
                 None => sup.log(&server.id, Stream::System, "Stopped."),
             }
             sup.emit_status(&server.id);

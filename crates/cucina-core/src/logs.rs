@@ -74,3 +74,93 @@ impl Ring {
         self.emitted_seq = self.next_seq;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Ring, MAX_LINES};
+    use crate::model::Stream;
+
+    #[test]
+    fn numbers_lines_and_returns_them_oldest_first() {
+        let mut ring = Ring::new();
+        ring.push(Stream::Stdout, "one");
+        ring.push(Stream::Stderr, "two");
+        let all = ring.tail(10);
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].seq, 0);
+        assert_eq!(all[0].text, "one");
+        assert_eq!(all[1].seq, 1);
+        assert_eq!(all[1].stream, Stream::Stderr);
+    }
+
+    #[test]
+    fn trims_the_trailing_newline_a_line_arrives_with() {
+        let mut ring = Ring::new();
+        ring.push(Stream::Stdout, "listening\r\n");
+        assert_eq!(ring.tail(1)[0].text, "listening");
+    }
+
+    /// A runaway process must not be able to grow the app's footprint.
+    #[test]
+    fn drops_the_oldest_lines_past_the_cap() {
+        let mut ring = Ring::new();
+        for i in 0..MAX_LINES + 50 {
+            ring.push(Stream::Stdout, &i.to_string());
+        }
+        let all = ring.tail(usize::MAX);
+        assert_eq!(all.len(), MAX_LINES);
+        // The first 50 fell off the front, but seq keeps counting.
+        assert_eq!(all[0].text, "50");
+        assert_eq!(all[0].seq, 50);
+    }
+
+    #[test]
+    fn truncates_a_single_absurdly_long_line() {
+        let mut ring = Ring::new();
+        ring.push(Stream::Stdout, &"x".repeat(10_000));
+        let text = &ring.tail(1)[0].text;
+        assert!(text.ends_with(" …"));
+        assert!(text.chars().count() < 5_000);
+    }
+
+    #[test]
+    fn tail_returns_the_newest_n() {
+        let mut ring = Ring::new();
+        for i in 0..10 {
+            ring.push(Stream::Stdout, &i.to_string());
+        }
+        let last = ring.tail(3);
+        assert_eq!(last.len(), 3);
+        assert_eq!(last[0].text, "7");
+        assert_eq!(last[2].text, "9");
+        // Asking for more than there is yields everything, not a panic.
+        assert_eq!(ring.tail(500).len(), 10);
+    }
+
+    #[test]
+    fn hands_each_line_to_subscribers_exactly_once() {
+        let mut ring = Ring::new();
+        assert!(!ring.has_pending());
+
+        ring.push(Stream::Stdout, "a");
+        assert!(ring.has_pending());
+        assert_eq!(ring.take_pending().len(), 1);
+        assert!(!ring.has_pending());
+        assert!(ring.take_pending().is_empty());
+
+        ring.push(Stream::Stdout, "b");
+        let next = ring.take_pending();
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].text, "b");
+    }
+
+    /// Clearing must not replay the whole buffer to subscribers afterwards.
+    #[test]
+    fn clearing_leaves_nothing_pending() {
+        let mut ring = Ring::new();
+        ring.push(Stream::Stdout, "a");
+        ring.clear();
+        assert!(!ring.has_pending());
+        assert!(ring.tail(10).is_empty());
+    }
+}

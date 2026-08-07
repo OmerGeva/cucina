@@ -12,7 +12,7 @@ pub mod proto;
 pub mod store;
 pub mod supervisor;
 
-pub use model::{Event, Group, LogLine, Origin, Server, State, Status, Stream};
 pub use git::Worktree;
+pub use model::{Event, Group, LogLine, Origin, Server, State, Status, Stream};
 pub use proto::{Request, Response, ServerView};
 pub use supervisor::Supervisor;

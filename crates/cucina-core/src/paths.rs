@@ -79,7 +79,15 @@ fn resolve_login_path() -> Option<String> {
         .output()
         .ok()?;
 
-    let text = String::from_utf8_lossy(&output.stdout);
+    extract_fenced(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Pull the value out from between the markers, ignoring whatever the shell
+/// printed around it.
+fn extract_fenced(text: &str) -> Option<String> {
+    const OPEN: &str = "__cucina_path(";
+    const CLOSE: &str = ")cucina_path__";
+
     let start = text.find(OPEN)? + OPEN.len();
     let end = start + text[start..].find(CLOSE)?;
     let path = text[start..end].trim();
@@ -103,5 +111,52 @@ pub fn login_shell() -> String {
     match name.as_str() {
         "zsh" | "bash" | "sh" | "ksh" | "dash" => shell,
         _ => "/bin/zsh".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{contract_tilde, expand_tilde, extract_fenced};
+    use std::path::Path;
+
+    #[test]
+    fn reads_path_from_between_the_markers() {
+        let out = "__cucina_path(/usr/bin:/bin)cucina_path__";
+        assert_eq!(extract_fenced(out).as_deref(), Some("/usr/bin:/bin"));
+    }
+
+    /// The reason the markers exist: an interactive startup file is entitled
+    /// to print whatever it likes before and after our command runs.
+    #[test]
+    fn ignores_banners_the_shell_printed() {
+        let out = "Agent pid 4242\n__cucina_path(/opt/homebrew/bin:/usr/bin)cucina_path__\nbye\n";
+        assert_eq!(
+            extract_fenced(out).as_deref(),
+            Some("/opt/homebrew/bin:/usr/bin")
+        );
+    }
+
+    #[test]
+    fn refuses_output_with_no_markers_or_an_empty_value() {
+        assert_eq!(extract_fenced("Agent pid 4242\n"), None);
+        assert_eq!(extract_fenced("__cucina_path()cucina_path__"), None);
+        assert_eq!(extract_fenced("__cucina_path(   )cucina_path__"), None);
+        // An opening marker with no close is a truncated read, not a value.
+        assert_eq!(extract_fenced("__cucina_path(/usr/bin"), None);
+    }
+
+    #[test]
+    fn tilde_expands_and_contracts_around_home() {
+        std::env::set_var("HOME", "/Users/test");
+        assert_eq!(
+            expand_tilde(Path::new("~/code")),
+            Path::new("/Users/test/code")
+        );
+        assert_eq!(expand_tilde(Path::new("~")), Path::new("/Users/test"));
+        // Only a leading ~ is special; one mid-path is a real directory name.
+        assert_eq!(expand_tilde(Path::new("/tmp/~x")), Path::new("/tmp/~x"));
+        assert_eq!(contract_tilde(Path::new("/Users/test/code")), "~/code");
+        assert_eq!(contract_tilde(Path::new("/Users/test")), "~");
+        assert_eq!(contract_tilde(Path::new("/etc/hosts")), "/etc/hosts");
     }
 }

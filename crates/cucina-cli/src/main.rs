@@ -74,20 +74,28 @@ impl Args {
 /// menu bar can show who started what.
 fn origin(args: &Args) -> Origin {
     if let Some(name) = args.get("agent").or_else(|| args.get("client")) {
-        return Origin::Agent { client: name.to_string() };
+        return Origin::Agent {
+            client: name.to_string(),
+        };
     }
     if args.has("agent") {
-        return Origin::Agent { client: "agent".into() };
+        return Origin::Agent {
+            client: "agent".into(),
+        };
     }
     if let Ok(name) = std::env::var("CUCINA_CLIENT") {
         return Origin::Agent { client: name };
     }
     if std::env::var_os("CLAUDECODE").is_some() {
-        return Origin::Agent { client: "Claude Code".into() };
+        return Origin::Agent {
+            client: "Claude Code".into(),
+        };
     }
     // A non-interactive stdout almost always means something scripted us.
     if !ui::is_tty(1) {
-        return Origin::Agent { client: "agent".into() };
+        return Origin::Agent {
+            client: "agent".into(),
+        };
     }
     Origin::User
 }
@@ -133,7 +141,10 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
                 views.retain(|v| &v.server.id == id || &v.server.name == id);
             }
             if args.has("json") {
-                println!("{}", serde_json::to_string_pretty(&views).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&views).unwrap_or_default()
+                );
             } else {
                 print!("{}", ui::table(&views, &paint));
             }
@@ -188,10 +199,16 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
             let id = need_id(args)?;
             let tail = args.get("tail").and_then(|v| v.parse().ok()).unwrap_or(200);
             let mut c = Client::connect_or_launch()?;
-            let res = c.request(&Request::Logs { id, tail: Some(tail) })?;
+            let res = c.request(&Request::Logs {
+                id,
+                tail: Some(tail),
+            })?;
             let lines = res.lines();
             if args.has("json") {
-                println!("{}", serde_json::to_string_pretty(&lines).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&lines).unwrap_or_default()
+                );
             } else {
                 for line in lines {
                     match line.stream {
@@ -210,7 +227,10 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
             let added: Server = serde_json::from_value(res.data.clone())
                 .map_err(|e| format!("Unexpected reply: {e}"))?;
             if args.has("json") {
-                println!("{}", serde_json::to_string_pretty(&added).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&added).unwrap_or_default()
+                );
             } else {
                 println!(
                     "  {} {} added — start it with {}",
@@ -238,14 +258,28 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
                 .ok_or_else(|| format!("No server called {key}."))?;
             let trees = cucina_core::git::worktrees(&view.server.dir);
             if trees.is_empty() {
-                return Err(format!("{} isn't a git worktree.", view.server.dir.display()));
+                return Err(format!(
+                    "{} isn't a git worktree.",
+                    view.server.dir.display()
+                ));
             }
             if args.has("json") {
-                println!("{}", serde_json::to_string_pretty(&trees).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&trees).unwrap_or_default()
+                );
             } else {
                 for tree in &trees {
-                    let mark = if tree.is_current { paint.green("●") } else { paint.dim("○") };
-                    let tag = if tree.is_main { paint.dim("  base") } else { String::new() };
+                    let mark = if tree.is_current {
+                        paint.green("●")
+                    } else {
+                        paint.dim("○")
+                    };
+                    let tag = if tree.is_main {
+                        paint.dim("  base")
+                    } else {
+                        String::new()
+                    };
                     println!("  {mark}  {}{tag}", paint.bold(&tree.branch));
                 }
             }
@@ -270,7 +304,10 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
                 path: tree.path.to_string_lossy().to_string(),
             })?;
             if args.has("json") {
-                println!("{}", serde_json::to_string_pretty(&res.data).unwrap_or_default());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&res.data).unwrap_or_default()
+                );
             } else {
                 println!(
                     "  {} {} now on {}{}",
@@ -369,7 +406,10 @@ fn resolve(views: &[cucina_core::proto::ServerView], key: &str) -> Result<Vec<St
 
 fn report_start(id: &str, res: &cucina_core::proto::Response, args: &Args, paint: &Paint) {
     if args.has("json") {
-        println!("{}", serde_json::to_string_pretty(&res.data).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&res.data).unwrap_or_default()
+        );
         return;
     }
     let view: Option<cucina_core::proto::ServerView> =
@@ -431,14 +471,35 @@ fn help(paint: &Paint) -> String {
     ));
     let rows: &[(String, String)] = &[
         (b("cucina"), d("what's on the heat")),
-        (format!("{} {}", b("cucina up"), d("<id>")), d("start one, --wait until it's listening")),
+        (
+            format!("{} {}", b("cucina up"), d("<id>")),
+            d("start one, --wait until it's listening"),
+        ),
         (format!("{} {}", b("cucina down"), d("<id>")), d("stop one")),
-        (format!("{} {}", b("cucina restart"), d("<id>")), d("stop and start again")),
-        (format!("{} {}", b("cucina logs"), d("<id>")), d("recent output, --tail N")),
-        (format!("{} {}", b("cucina open"), d("<id>")), d("open it in the browser")),
-        (format!("{} {}", b("cucina worktrees"), d("<id>")), d("git worktrees it can run from")),
-        (format!("{} {}", b("cucina switch"), d("<id> <branch>")), d("move it to another worktree")),
-        (b("cucina add"), d("--name api --dir . --command \"npm run dev\"")),
+        (
+            format!("{} {}", b("cucina restart"), d("<id>")),
+            d("stop and start again"),
+        ),
+        (
+            format!("{} {}", b("cucina logs"), d("<id>")),
+            d("recent output, --tail N"),
+        ),
+        (
+            format!("{} {}", b("cucina open"), d("<id>")),
+            d("open it in the browser"),
+        ),
+        (
+            format!("{} {}", b("cucina worktrees"), d("<id>")),
+            d("git worktrees it can run from"),
+        ),
+        (
+            format!("{} {}", b("cucina switch"), d("<id> <branch>")),
+            d("move it to another worktree"),
+        ),
+        (
+            b("cucina add"),
+            d("--name api --dir . --command \"npm run dev\""),
+        ),
         (format!("{} {}", b("cucina rm"), d("<id>")), d("remove one")),
         (b("cucina mcp"), d("run as an MCP server for coding agents")),
     ];

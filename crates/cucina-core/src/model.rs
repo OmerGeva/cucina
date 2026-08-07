@@ -161,6 +161,44 @@ pub enum Event {
     Status(Status),
     /// Someone tried to launch a second Cucina; raise the window we have.
     Show,
-    Log { id: String, lines: Vec<LogLine> },
+    Log {
+        id: String,
+        lines: Vec<LogLine>,
+    },
     ServersChanged,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{slugify, State};
+
+    #[test]
+    fn slugs_are_stable_and_cli_friendly() {
+        assert_eq!(slugify("My API"), "my-api");
+        assert_eq!(slugify("Acme Data Service"), "acme-data-service");
+        assert_eq!(slugify("api"), "api");
+    }
+
+    #[test]
+    fn slugs_collapse_punctuation_and_trim_dashes() {
+        assert_eq!(slugify("  API (v2)!  "), "api-v2");
+        assert_eq!(slugify("a---b"), "a-b");
+        assert_eq!(slugify("web_app"), "web-app");
+    }
+
+    /// A name with nothing usable in it still has to produce an id.
+    #[test]
+    fn slugs_never_come_back_empty() {
+        assert_eq!(slugify(""), "server");
+        assert_eq!(slugify("!!!"), "server");
+        assert_eq!(slugify("日本語"), "server");
+    }
+
+    #[test]
+    fn only_starting_and_running_count_as_live() {
+        assert!(State::Running.is_live());
+        assert!(State::Starting.is_live());
+        assert!(!State::Stopped.is_live());
+        assert!(!State::Crashed.is_live());
+    }
 }

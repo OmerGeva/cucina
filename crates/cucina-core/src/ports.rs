@@ -97,7 +97,10 @@ mod tests {
 
     #[test]
     fn reads_ports_out_of_dev_server_banners() {
-        assert_eq!(scan_line("  ➜  Local:   http://localhost:5173/"), Some(5173));
+        assert_eq!(
+            scan_line("  ➜  Local:   http://localhost:5173/"),
+            Some(5173)
+        );
         assert_eq!(scan_line("Listening on http://127.0.0.1:3000"), Some(3000));
         assert_eq!(scan_line("server started on :8080"), Some(8080));
     }

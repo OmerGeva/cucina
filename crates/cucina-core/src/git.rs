@@ -37,17 +37,20 @@ pub fn worktrees(dir: &Path) -> Vec<Worktree> {
         return Vec::new();
     }
 
-    let here = dir.canonicalize().ok();
+    parse_worktrees(
+        &String::from_utf8_lossy(&output.stdout),
+        dir.canonicalize().ok(),
+    )
+}
+
+/// Read `git worktree list --porcelain`. Records are separated by a blank
+/// line; a trailing empty line flushes the last one.
+fn parse_worktrees(stdout: &str, here: Option<PathBuf>) -> Vec<Worktree> {
     let mut found: Vec<Worktree> = Vec::new();
     let mut path: Option<PathBuf> = None;
     let mut branch = String::new();
 
-    // Records are separated by a blank line; a trailing empty push flushes the
-    // last one.
-    for line in String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .chain(std::iter::once(""))
-    {
+    for line in stdout.lines().chain(std::iter::once("")) {
         if let Some(rest) = line.strip_prefix("worktree ") {
             path = Some(PathBuf::from(rest));
             branch.clear();
@@ -60,11 +63,11 @@ pub fn worktrees(dir: &Path) -> Vec<Worktree> {
             }
         } else if line.is_empty() {
             if let Some(p) = path.take() {
-                let is_current = here
-                    .as_ref()
-                    .zip(p.canonicalize().ok())
-                    .map(|(a, b)| *a == b)
-                    .unwrap_or(false);
+                // Compare canonical paths where we can; fall back to the raw
+                // path so a worktree git knows about but we cannot stat is
+                // still matched.
+                let resolved = p.canonicalize().unwrap_or_else(|_| p.clone());
+                let is_current = here.as_ref().is_some_and(|h| *h == resolved);
                 found.push(Worktree {
                     is_main: found.is_empty(), // git always lists the main one first
                     branch: std::mem::take(&mut branch),
@@ -74,10 +77,15 @@ pub fn worktrees(dir: &Path) -> Vec<Worktree> {
             }
         }
     }
+
     // Git lists in its own order, which is unscannable once a repo has a dozen
     // worktrees. Sort the rest the way a person reads them, and keep the main
     // worktree pinned at the top as the anchor to return to.
-    let main = if found.is_empty() { None } else { Some(found.remove(0)) };
+    let main = if found.is_empty() {
+        None
+    } else {
+        Some(found.remove(0))
+    };
     found.sort_by(|a, b| natural_cmp(&a.branch, &b.branch));
     if let Some(main) = main {
         found.insert(0, main);
@@ -103,8 +111,12 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
                 j += 1;
             }
             // Compare by value, falling back to text for numbers too long to fit.
-            let na = std::str::from_utf8(&a[start_a..i]).unwrap_or("").parse::<u128>();
-            let nb = std::str::from_utf8(&b[start_b..j]).unwrap_or("").parse::<u128>();
+            let na = std::str::from_utf8(&a[start_a..i])
+                .unwrap_or("")
+                .parse::<u128>();
+            let nb = std::str::from_utf8(&b[start_b..j])
+                .unwrap_or("")
+                .parse::<u128>();
             match (na, nb) {
                 (Ok(x), Ok(y)) if x != y => return x.cmp(&y),
                 (Ok(_), Ok(_)) => {}
@@ -141,5 +153,59 @@ mod tests {
     fn text_compares_case_insensitively() {
         assert_eq!(natural_cmp("feat-agent", "feat-464"), Ordering::Greater);
         assert_eq!(natural_cmp("main", "MAIN"), Ordering::Equal);
+    }
+
+    const PORCELAIN: &str = "\
+worktree /repo
+HEAD abc123def4567890
+branch refs/heads/main
+
+worktree /repo/.wt/feat-64
+HEAD 1111111111111111
+branch refs/heads/feat-64
+
+worktree /repo/.wt/feat-522
+HEAD 2222222222222222
+branch refs/heads/feat-522
+
+worktree /repo/.wt/detached
+HEAD 9876543210abcdef
+
+";
+
+    #[test]
+    fn keeps_the_main_worktree_first_and_sorts_the_rest() {
+        let found = super::parse_worktrees(PORCELAIN, None);
+        let branches: Vec<&str> = found.iter().map(|w| w.branch.as_str()).collect();
+        // main is pinned; 64 sorts before 522 by value, not by text.
+        assert_eq!(branches, vec!["main", "9876543", "feat-64", "feat-522"]);
+        assert!(found[0].is_main);
+        assert!(!found[1].is_main);
+    }
+
+    /// A detached worktree has no branch line, so it is named by a short commit.
+    #[test]
+    fn names_a_detached_head_by_its_commit() {
+        let found = super::parse_worktrees(PORCELAIN, None);
+        let detached = found.iter().find(|w| w.path.ends_with("detached")).unwrap();
+        assert_eq!(detached.branch, "9876543");
+    }
+
+    #[test]
+    fn marks_the_worktree_we_asked_from_as_current() {
+        let here = Some(std::path::PathBuf::from("/repo/.wt/feat-64"));
+        let found = super::parse_worktrees(PORCELAIN, here);
+        let current: Vec<&str> = found
+            .iter()
+            .filter(|w| w.is_current)
+            .map(|w| w.branch.as_str())
+            .collect();
+        assert_eq!(current, vec!["feat-64"]);
+    }
+
+    /// Not a git repository at all — the caller uses this to hide the picker.
+    #[test]
+    fn yields_nothing_for_empty_output() {
+        assert!(super::parse_worktrees("", None).is_empty());
     }
 }

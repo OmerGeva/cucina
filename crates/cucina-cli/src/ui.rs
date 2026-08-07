@@ -87,16 +87,22 @@ pub fn table(views: &[ServerView], paint: &Paint) -> String {
     }
 
     let now = cucina_core::model::now_ms();
-    let name_w = views.iter().map(|v| v.server.name.len()).max().unwrap_or(4).max(4);
-    let state_w = views.iter().map(|v| word(v.status.state).len()).max().unwrap_or(7);
+    let name_w = views
+        .iter()
+        .map(|v| v.server.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
+    let state_w = views
+        .iter()
+        .map(|v| word(v.status.state).len())
+        .max()
+        .unwrap_or(7);
 
     let mut out = String::new();
     for v in views {
         let s = &v.status;
-        let port = s
-            .port
-            .map(|p| format!(":{p}"))
-            .unwrap_or_default();
+        let port = s.port.map(|p| format!(":{p}")).unwrap_or_default();
         let uptime = s
             .started_at
             .filter(|_| s.state.is_live())

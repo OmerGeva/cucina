@@ -8,3 +8,9 @@ license.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 libc.workspace = true
+
+# Re-executes itself and SIGKILLs the copy, so it needs its own main rather
+# than the libtest harness.
+[[test]]
+name = "crash_safety"
+harness = false

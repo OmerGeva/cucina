@@ -70,11 +70,19 @@ pub struct Response {
 
 impl Response {
     pub fn ok(data: serde_json::Value) -> Self {
-        Response { ok: true, error: None, data }
+        Response {
+            ok: true,
+            error: None,
+            data,
+        }
     }
 
     pub fn empty() -> Self {
-        Response { ok: true, error: None, data: serde_json::Value::Null }
+        Response {
+            ok: true,
+            error: None,
+            data: serde_json::Value::Null,
+        }
     }
 
     pub fn err(message: impl Into<String>) -> Self {

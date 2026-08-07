@@ -42,7 +42,9 @@ pub fn serve(sup: Arc<Supervisor>) -> std::io::Result<()> {
 }
 
 fn handle(sup: Arc<Supervisor>, stream: UnixStream) {
-    let Ok(write_half) = stream.try_clone() else { return };
+    let Ok(write_half) = stream.try_clone() else {
+        return;
+    };
     let reader = BufReader::new(stream);
     let mut writer = write_half;
 
@@ -54,7 +56,9 @@ fn handle(sup: Arc<Supervisor>, stream: UnixStream) {
             Ok(req) => dispatch(&sup, req),
             Err(e) => Response::err(format!("Bad request: {e}")),
         };
-        let Ok(mut body) = serde_json::to_vec(&response) else { break };
+        let Ok(mut body) = serde_json::to_vec(&response) else {
+            break;
+        };
         body.push(b'\n');
         if writer.write_all(&body).is_err() || writer.flush().is_err() {
             break;
@@ -112,12 +116,20 @@ fn dispatch(sup: &Arc<Supervisor>, req: Request) -> Response {
             Err(e) => Response::err(e.to_string()),
         },
 
-        Request::Start { id, origin, wait_ms } => match sup.start(&id, origin) {
+        Request::Start {
+            id,
+            origin,
+            wait_ms,
+        } => match sup.start(&id, origin) {
             Ok(()) => finish(sup, &id, wait_ms),
             Err(e) => Response::err(e),
         },
 
-        Request::Restart { id, origin, wait_ms } => match sup.restart(&id, origin) {
+        Request::Restart {
+            id,
+            origin,
+            wait_ms,
+        } => match sup.restart(&id, origin) {
             Ok(()) => finish(sup, &id, wait_ms),
             Err(e) => Response::err(e),
         },
