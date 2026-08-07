@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Group, LogLine, Server, ServerView, Status } from './api'
+import type { Group, LogLine, Server, ServerView, Status, Worktree } from './api'
 import { api, blankServer, isLive, onEvent } from './api'
 import Rail from './ui/Rail'
 import type { Route } from './ui/Rail'
@@ -14,9 +14,21 @@ const MAX_LINES = 2000
 export default function App() {
   const [views, setViews] = useState<ServerView[]>([])
   const [groups, setGroups] = useState<Group[]>([])
-  const [route, setRoute] = useState<Route>({ kind: 'all' })
+  // Worktrees are read once for every server here rather than per component:
+  // the cards each want the current branch, and Worktrees.tsx wants the whole
+  // list, so fetching in either place would mean one call per card per render.
+  const [trees, setTrees] = useState<Map<string, Worktree[]>>(new Map())
+  // The design harness can open straight onto a screen (preview.html?at=…),
+  // so each one can be reviewed without clicking through. Undefined in the
+  // real app, which always opens on the index.
+  const [route, setRoute] = useState<Route>(
+    () => (window as unknown as { __cucinaRoute?: Route }).__cucinaRoute ?? { kind: 'all' },
+  )
   const [lines, setLines] = useState<LogLine[]>([])
-  const [editing, setEditing] = useState<Server | null>(null)
+  const [editing, setEditing] = useState<Server | null>(
+    // The harness can also open straight into the sheet (preview.html?at=add).
+    () => ((window as unknown as { __cucinaAdd?: boolean }).__cucinaAdd ? blankServer() : null),
+  )
   const [home, setHome] = useState('')
   const [now, setNow] = useState(() => Date.now())
 
@@ -30,6 +42,16 @@ export default function App() {
     const [nextViews, nextGroups] = await Promise.all([api.list(), api.groups()])
     setViews(nextViews)
     setGroups(nextGroups)
+
+    // A directory that isn't a git repo just yields an empty list, so a
+    // failure here should never take the rest of the refresh down with it.
+    const found = await Promise.all(
+      nextViews.map(async (v) => {
+        const list = await api.worktrees(v.server.id).catch(() => [] as Worktree[])
+        return [v.server.id, list] as const
+      }),
+    )
+    setTrees(new Map(found))
     setRoute((current) => {
       if (current.kind === 'server' && !nextViews.some((v) => v.server.id === current.id)) {
         return { kind: 'all' }
@@ -145,9 +167,6 @@ export default function App() {
     [views],
   )
 
-  const onIcon = useCallback((group: string, icon: string) => {
-    void api.setGroupIcon(group, icon).catch(console.error)
-  }, [])
 
   const openPort = useCallback((port: number) => {
     void api.openUrl(`http://localhost:${port}`).catch(console.error)
@@ -184,12 +203,14 @@ export default function App() {
             onClearLogs={() => {
               void api.clearLogs(current.server.id).then(() => setLines([]))
             }}
+            trees={trees.get(current.server.id) ?? []}
             onSwitched={() => void refresh()}
           />
         ) : (
           <Home
             views={views}
             groups={groups}
+            trees={trees}
             project={route.kind === 'project' ? route.name : null}
             now={now}
             onOpen={(id) => setRoute({ kind: 'server', id })}
@@ -198,7 +219,6 @@ export default function App() {
             onAdd={addServer}
             onGroupRun={onGroupRun}
             onMove={onMove}
-            onIcon={onIcon}
             onOpenPort={openPort}
           />
         )}

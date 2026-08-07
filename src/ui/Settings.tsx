@@ -60,7 +60,7 @@ export default function Settings() {
             <h2 className="panel-title">Cucina</h2>
             <p className="prose">Keep your local servers on the heat.</p>
           </div>
-          <span className="version">{version ? `v${version}` : ''}</span>
+          {version ? <span className="version">v{version}</span> : null}
         </div>
       </section>
 

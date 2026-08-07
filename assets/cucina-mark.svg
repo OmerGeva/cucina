@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Cucina — sun on the ruling</title>
+  <defs>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185" ry="185"></rect></clipPath>
+    <clipPath id="above"><rect x="100" y="100" width="824" height="605"></rect></clipPath>
+    <clipPath id="ruled"><rect x="100" y="100" width="824" height="595"></rect></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="824" fill="#f2eee4"></rect>
+    <g clip-path="url(#ruled)" fill="#1a1815" opacity="0.5">
+      <rect x="100.00" y="100" width="9.7" height="824"></rect>
+      <rect x="158.00" y="100" width="9.7" height="824"></rect>
+      <rect x="216.00" y="100" width="9.7" height="824"></rect>
+      <rect x="274.00" y="100" width="9.7" height="824"></rect>
+      <rect x="332.00" y="100" width="9.7" height="824"></rect>
+      <rect x="390.00" y="100" width="9.7" height="824"></rect>
+      <rect x="448.00" y="100" width="9.7" height="824"></rect>
+      <rect x="506.00" y="100" width="9.7" height="824"></rect>
+      <rect x="564.00" y="100" width="9.7" height="824"></rect>
+      <rect x="622.00" y="100" width="9.7" height="824"></rect>
+      <rect x="680.00" y="100" width="9.7" height="824"></rect>
+      <rect x="738.00" y="100" width="9.7" height="824"></rect>
+      <rect x="796.00" y="100" width="9.7" height="824"></rect>
+      <rect x="854.00" y="100" width="9.7" height="824"></rect>
+      <rect x="912.00" y="100" width="9.7" height="824"></rect>
+    </g>
+    <g clip-path="url(#above)">
+      <circle cx="512" cy="545" r="200" fill="#e8402a"></circle>
+    </g>
+    <rect x="100" y="695" width="824" height="10" fill="#1a1815"></rect>
+  </g>
+</svg>

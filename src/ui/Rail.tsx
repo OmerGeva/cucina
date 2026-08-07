@@ -16,7 +16,8 @@ interface Props {
   onAdd: () => void
 }
 
-/** Projects with no icon still need a mark, so use their initial. */
+/** Projects are marked by their initial — set in the same Helvetica as
+    everything else, so the rail carries no stray artwork. */
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || '·'
 
 export default function Rail({ route, groups, views, onRoute, onAdd }: Props) {
@@ -50,11 +51,7 @@ export default function Rail({ route, groups, views, onRoute, onAdd }: Props) {
             title={group.name}
             aria-label={group.name}
           >
-            {group.icon ? (
-              <span className="rail-emoji">{group.icon}</span>
-            ) : (
-              <span className="rail-initial">{initial(group.name)}</span>
-            )}
+            <span className="rail-initial">{initial(group.name)}</span>
             {liveIn(group.name) ? <span className="rail-live" /> : null}
           </button>
         ))}

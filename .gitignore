@@ -8,3 +8,7 @@ node_modules
 
 # macOS
 .DS_Store
+
+# tauri icon also emits Android and iOS sets; this is a macOS app.
+/src-tauri/icons/android
+/src-tauri/icons/ios

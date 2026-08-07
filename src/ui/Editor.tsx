@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { Server } from '../api'
 import { api, parentFolder, shortenPath } from '../api'
 import Select from './Select'
-import { shuffleTile, tileUrl } from '../tiles'
+import { pitchFor, shufflePitch } from '../rings'
 
 interface Props {
   server: Server
@@ -111,6 +111,7 @@ export default function Editor({
       >
         <div className="sheet-head">
           <h2>{isNew ? 'Add a server' : server.name}</h2>
+          <span className="rule" />
         </div>
 
         <div className="sheet-body">
@@ -263,16 +264,16 @@ export default function Editor({
             <div className="tile-pick">
               <button
                 className="tile-preview"
-                title="Shuffle the tile"
-                onClick={() => setTile((t) => shuffleTile(t))}
+                title="Shuffle the ring signature"
+                onClick={() => setTile((t) => shufflePitch(t))}
                 style={
                   {
-                    backgroundImage: `url("${tileUrl({ id: server.id || name || 'new', tile })}")`,
+                    ['--pitch' as string]: pitchFor({ id: server.id || name || 'new', tile }),
                   } as CSSProperties
                 }
               />
-              <button className="link-btn centred" onClick={() => setTile((t) => shuffleTile(t))}>
-                Shuffle tile
+              <button className="link-btn centred" onClick={() => setTile((t) => shufflePitch(t))}>
+                Shuffle
               </button>
             </div>
           </div>

@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { CaretLeft } from '@phosphor-icons/react'
-import type { LogLine, ServerView } from '../api'
+import type { LogLine, ServerView, Worktree } from '../api'
 import { originLabel, shortenPath, uptime } from '../api'
-import { Chip } from './bits'
+import { Dot, stateWord } from './bits'
 import Worktrees from './Worktrees'
 
 interface Props {
   view: ServerView
   lines: LogLine[]
   home: string
+  /** Read once in App and passed down. */
+  trees: Worktree[]
   now: number
   onBack: () => void
   onStart: () => void
@@ -25,6 +27,7 @@ export default function Detail({
   view,
   lines,
   home,
+  trees,
   now,
   onBack,
   onStart,
@@ -70,13 +73,18 @@ export default function Detail({
     <>
       <header className="detail-head">
         <button className="back" onClick={onBack}>
-          <CaretLeft weight="bold" size={13} />
+          <CaretLeft weight="bold" />
           All servers
         </button>
 
         <div className="detail-title">
           <h1>{server.name}</h1>
-          <Chip state={status.state} />
+
+          {/* A filled square and the word — the state needs no capsule. */}
+          <span className="chip">
+            <Dot state={status.state} />
+            {stateWord(status.state)}
+          </span>
           {agent ? <span className="chip agent">by {agent}</span> : null}
 
           {status.port ? (
@@ -85,8 +93,7 @@ export default function Detail({
               onClick={() => onOpenPort(status.port!)}
               title={`Open localhost:${status.port}`}
             >
-              <span className="colon">:</span>
-              {status.port}
+              :{status.port}
             </button>
           ) : null}
         </div>
@@ -95,12 +102,7 @@ export default function Detail({
           <button className="path-btn" onClick={onReveal} title="Reveal in Finder">
             {shortenPath(server.dir, home)}
           </button>
-          <Worktrees
-            serverId={server.id}
-            dir={server.dir}
-            live={live}
-            onSwitched={onSwitched}
-          />
+          <Worktrees serverId={server.id} trees={trees} live={live} onSwitched={onSwitched} />
           <span className="sep">·</span>
           <span>{server.command}</span>
           {live && status.startedAt ? (

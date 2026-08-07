@@ -1,70 +1,58 @@
-/* Cucina
+/* Cucina — the printed field
    ---------------------------------------------------------------------------
-   Structure first: the servers are the content, so they are cards on a soft
+   1960s Milanese modernism by way of Franco Grignani: a ground of hairline
+   rulings, concentric ring discs, one vermilion accent, and Helvetica set
+   large and tight.
+
+   Structure first: the servers are the content, so they are cards on a ruled
    ground — not rows in a sidebar next to an empty log box. A narrow rail holds
    navigation, a hero band carries overall state, and logs are a drill-in that
    gets the whole window when you actually want them.
 
-   Colour comes off the app icon: a glazed plate, a fine blue rim, butter-yellow
-   pasta. Cards are near-white on warm stone; blue is the single action colour;
-   butter means alive.
+   Radius is 0 everywhere. The only circles in the app are the ring discs and
+   the rail's live pip.
 
-   Depth is layered and tinted to the ground — never a pure black shadow on a
-   warm surface, which is what makes generated UI look plastic.
-
-   Radius scale, held everywhere: 8px controls, 14px cards and panels. No
-   pills — a stadium-shaped button on every surface is a template signature,
-   and squared edges sit better against tile and ceramic. The one exception is
-   the play/stop control, which is round because every media control is.
-   Motion: nothing loops except one transient pulse while a server warms up. */
+   Depth is a 1px hairline and paper sitting on the ruling — there are no
+   shadows. The single exception is the modal sheet, which genuinely floats.
+   Motion: 130–150ms on colour and border, the sheet's rise, and one transient
+   pulse on the starting square. Nothing loops. */
 
 :root {
-  --ground: #f1ede4;
-  --rail: #f7f3ea;
-  --card: #fffdf9;
-  --card-lift: #ffffff;
+  /* ground and paper */
+  --ground: #f7f4ec;
+  --rail: #f2eee4;
+  --card: #fffdf7;
+  --card-idle: rgba(255, 253, 247, 0.66);
+  --tint: #f2eee4;
 
-  --ink: #2a2722;
-  --ink-2: #6b6559;
-  --ink-3: #9d9584;
+  /* ink */
+  --ink: #1a1815;
+  --ink-2: rgba(26, 24, 21, 0.6);
+  --ink-3: rgba(26, 24, 21, 0.45);
+  --ink-4: rgba(26, 24, 21, 0.28);
 
-  --line: rgba(60, 50, 35, 0.1);
-  --line-firm: rgba(60, 50, 35, 0.16);
-  --wash: rgba(60, 50, 35, 0.05);
+  /* lines */
+  --hairline: rgba(26, 24, 21, 0.16);
+  --rule: rgba(26, 24, 21, 0.22);
+  --line-control: rgba(26, 24, 21, 0.3);
+  --wash: rgba(26, 24, 21, 0.07);
 
-  /* The rim */
-  --blue: #3d5f8a;
-  --blue-hi: #4d74a6;
-  --blue-wash: #e9f0f8;
+  /* the one accent */
+  --vermilion: #e8402a;
 
-  /* The pasta */
-  --butter: #dfa32b;
-  --butter-wash: #fbf0d6;
-
-  --clay: #bd5238;
-  --clay-wash: #faeae5;
-
-  --shadow-1: 0 1px 2px rgba(60, 50, 35, 0.06);
-  --shadow-2: 0 1px 2px rgba(60, 50, 35, 0.05), 0 6px 16px rgba(60, 50, 35, 0.07);
-  --shadow-3: 0 2px 4px rgba(60, 50, 35, 0.06), 0 14px 34px rgba(60, 50, 35, 0.12);
-
-  /* Bundled, not system — a default system face is the loudest tell that
-     nobody chose the type. Cabinet Grotesk has the character for display,
-     Switzer stays quiet and legible at UI sizes. */
-  --ui: 'Switzer', -apple-system, system-ui, sans-serif;
-  --display: 'Cabinet Grotesk', 'Switzer', -apple-system, sans-serif;
-  --mono: 'SF Mono', ui-monospace, Menlo, monospace;
+  /* Helvetica is a deliberate choice here, not a fallback for a face we did
+     not bundle: the direction is Vignelli-era Milanese and Helvetica is the
+     face of it. Courier Prime is the Olivetti Lettera — a typewriter — and it
+     carries every machine string: ports on the detail screen, paths, branch
+     names, uptime, log output and code. */
+  --ui: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: 'Courier Prime', 'SF Mono', ui-monospace, Menlo, monospace;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
   --titlebar: 40px;
   --rail-w: 84px;
-
-  /* Fallback card artwork, and the source for the hero band. Individual
-     cards override this per server — see src/tiles.ts. */
-  --ceramic: url('./img/tile-1.jpg');
-  --plaster: url('./img/ground-plaster.jpg');
 }
 
 * {
@@ -101,34 +89,32 @@ button {
   width: 11px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(60, 50, 35, 0.18);
+  background: rgba(26, 24, 21, 0.18);
   border: 3.5px solid transparent;
   background-clip: content-box;
-  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(60, 50, 35, 0.3);
+  background: rgba(26, 24, 21, 0.3);
   background-clip: content-box;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+/* The ruling: the whole visual idea. A 1px line every 8px, fixed so it does
+   not scroll — the paper moves over the field, the field stays put. The rail
+   and every card are solid, so the ruling stops wherever paper begins. */
 .app {
   height: 100%;
   display: grid;
   grid-template-columns: var(--rail-w) 1fr;
-  /* One plaster surface stretched across the window rather than tiled — the
-     texture is photographic, so repeating it would show seams. It does not
-     scroll, so the whole app reads as resting on a real wall. */
   background-color: var(--ground);
-  /* A wash over the plaster keeps it light enough for small type to hold
-     contrast, without flattening the texture out. */
-  background-image: linear-gradient(rgba(255, 253, 247, 0.4), rgba(255, 253, 247, 0.4)),
-    var(--plaster);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(26, 24, 21, 0.055) 0 1px,
+    transparent 1px 8px
+  );
+  background-attachment: fixed;
 }
 
 .spacer {
@@ -138,73 +124,64 @@ button {
 /* ---- rail --------------------------------------------------------------- */
 
 .rail {
-  background: rgba(255, 253, 246, 0.42);
-  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 0 10px;
   gap: 3px;
+  padding-bottom: 12px;
+  background: var(--rail);
+  border-right: 1px solid var(--hairline);
+  min-height: 0;
 }
 
-/* Dragging is driven by data-tauri-drag-region on the element itself;
-   -webkit-app-region is an Electron feature that WKWebView ignores. */
 .rail-top {
-  height: 30px;
+  height: var(--titlebar);
   flex: none;
-  width: 100%;
 }
 
 .rail-btn {
-  width: 40px;
-  height: 36px;
+  position: relative;
+  width: 34px;
+  height: 34px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   transition:
     background 130ms var(--ease-out),
-    color 130ms var(--ease-out),
-    transform 130ms var(--ease-out);
+    color 130ms var(--ease-out);
 }
 
 .rail-btn:hover {
   background: var(--wash);
-  color: var(--ink-2);
-}
-
-.rail-btn:active {
-  transform: scale(0.94);
+  color: var(--ink);
 }
 
 .rail-btn.on {
-  background: var(--card);
-  color: var(--blue);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
+  background: var(--ink);
+  color: var(--rail);
 }
 
 .rail-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
 }
 
 .rail-rule {
-  width: 26px;
+  width: 22px;
   height: 1px;
+  background: var(--rule);
+  margin: 7px 0;
   flex: none;
-  background: var(--line-firm);
-  margin: 5px 0;
 }
 
 .rail-projects {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  overflow-y: auto;
+  gap: 3px;
   min-height: 0;
-  width: 100%;
+  overflow-y: auto;
   scrollbar-width: none;
 }
 
@@ -212,37 +189,22 @@ button {
   display: none;
 }
 
-.rail-btn.project {
-  position: relative;
-  font-size: 15px;
+.rail-initial {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   line-height: 1;
 }
 
-.rail-initial {
-  font-family: var(--display);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink-2);
-}
-
-.rail-btn.project.on .rail-initial {
-  color: var(--blue);
-}
-
-/* A crumb of butter on a project that has something running. */
+/* The one circle in the interface besides the ring discs. */
 .rail-live {
   position: absolute;
-  right: 4px;
+  right: 3px;
   bottom: 4px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--butter);
-  box-shadow: 0 0 0 2px var(--rail);
-}
-
-.rail-btn.on .rail-live {
-  box-shadow: 0 0 0 2px var(--card);
+  background: var(--vermilion);
 }
 
 /* ---- page --------------------------------------------------------------- */
@@ -263,44 +225,34 @@ button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 30px 34px;
+  padding: 2px 34px 34px;
 }
 
 .page-head {
   display: flex;
   align-items: baseline;
-  gap: 9px;
-  padding-bottom: 18px;
+  gap: 14px;
+  padding-bottom: 16px;
 }
 
+/* Bigger than the section titles under it — this is the one place the type
+   should outrank everything below. */
 .page-head h1 {
-  font-family: var(--display);
-  font-size: 31px;
-  font-weight: 660;
-  letter-spacing: -0.028em;
+  font: 700 34px/0.9 var(--ui);
+  letter-spacing: -0.045em;
   margin: 0;
 }
 
-.page-head .sub {
-  font-size: 13px;
-  color: var(--ink-3);
-  margin-left: 2px;
+/* The old hero button, moved up to the title row where it belongs. */
+.head-action {
+  font: 700 10px var(--ui);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--vermilion);
 }
 
-.page-emoji {
-  font-size: 21px;
-  line-height: 1;
-  align-self: center;
-}
-
-/* The app's mark carries identity here, so the rail doesn't repeat it. */
-.page-mark {
-  width: 56px;
-  height: 56px;
-  align-self: center;
-  /* Pulled tight to the wordmark; the negative margins keep the oversized
-     mark from inflating the header's height. */
-  margin: -8px -3px -8px -6px;
+.head-action:hover {
+  text-decoration: underline;
 }
 
 /* ---- hero --------------------------------------------------------------- */
@@ -308,98 +260,106 @@ button {
 .hero {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
-  padding: 22px 24px;
-  min-height: 112px;
-  margin-bottom: 26px;
+  height: 198px;
+  margin-bottom: 24px;
+  padding: 24px 30px;
   display: flex;
-  align-items: center;
-  gap: 20px;
-  background-color: var(--card);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--hairline);
 }
 
-.hero::after {
-  content: '';
+/* The ring pair: a field of concentric hairlines faded out with a radial
+   mask, and a solid disc sitting inside it, off-centre to the left. */
+.hero-field {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 360px;
-  max-width: 46%;
-  background-image: var(--ceramic);
-  background-size: cover;
-  background-position: right bottom;
-  background-repeat: no-repeat;
-  mask-image: linear-gradient(to left, #000 0 34%, transparent 96%);
-  -webkit-mask-image: linear-gradient(to left, #000 0 34%, transparent 96%);
-  opacity: 0.7;
+  right: -56px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 326px;
+  height: 326px;
+  border-radius: 50%;
+  background-image: repeating-radial-gradient(
+    circle at 50% 50%,
+    #1a1815 0 1.5px,
+    transparent 1.5px 9px
+  );
+  opacity: 0.34;
+  mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 72%);
   pointer-events: none;
 }
 
-.hero > * {
+.hero-disc {
+  position: absolute;
+  right: 88px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: var(--vermilion);
+  pointer-events: none;
+}
+
+.hero-body,
+.hero-foot {
   position: relative;
   z-index: 1;
 }
 
-.hero.warm {
-  background-image: linear-gradient(160deg, rgba(255, 238, 197, 0.72), rgba(255, 251, 240, 0.2) 68%);
-}
-
+/* Count and word share a baseline, so the number reads as display type with a
+   caption set into it rather than as a heading with a subtitle. */
 .hero-body {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
   min-width: 0;
-  flex: 1;
 }
 
 .hero-count {
-  font-family: var(--display);
-  font-size: 29px;
-  font-weight: 680;
-  letter-spacing: -0.032em;
-  line-height: 1.05;
+  font-size: 118px;
+  font-weight: 700;
+  line-height: 0.76;
+  letter-spacing: -0.06em;
+  color: var(--ink);
   margin: 0;
 }
 
-.hero-ports {
-  margin-top: 8px;
+.hero-word {
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.hero-foot {
   display: flex;
+  align-items: baseline;
+  gap: 22px;
   flex-wrap: wrap;
-  gap: 6px;
 }
 
-.hero-caption {
-  margin-top: 7px;
-  font-size: 12.5px;
-  color: var(--ink-2);
-  max-width: 46ch;
-  line-height: 1.5;
-}
-
-/* Ports are set as type, not as chips — a bordered capsule around a number is
-   a component-library reflex. */
-.hero-ports {
-  gap: 14px;
-}
-
+/* Display type at this size, so Helvetica — not the typewriter. */
 .port-pill {
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  color: var(--blue);
-  padding: 0;
-  text-underline-offset: 4px;
-  transition: color 120ms var(--ease-out);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--vermilion);
+  transition: opacity 130ms var(--ease-out);
 }
 
 .port-pill:hover {
-  color: #2c4668;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
+  opacity: 0.65;
 }
 
-.port-pill:active {
-  opacity: 0.7;
+.hero-caption {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
 }
 
 /* ---- sections ----------------------------------------------------------- */
@@ -408,7 +368,6 @@ button {
   position: relative;
   margin: 0 -10px 24px;
   padding: 0 10px 4px;
-  border-radius: 16px;
   border: 1.5px dashed transparent;
   transition:
     background 150ms var(--ease-out),
@@ -417,90 +376,42 @@ button {
 
 /* Where a dragged card would land. */
 .section.drop-over {
-  background: var(--butter-wash);
-  border-color: var(--butter);
+  background: rgba(232, 64, 42, 0.06);
+  border-color: var(--vermilion);
 }
 
 .section-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 2px 11px;
-  min-height: 26px;
-}
-
-.section-icon {
-  width: 20px;
-  height: 20px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  line-height: 1;
-  border-radius: 6px;
-  transition:
-    opacity 130ms var(--ease-out),
-    background 130ms var(--ease-out);
-}
-
-.section-icon.unset {
-  opacity: 0;
-  color: var(--ink-3);
-  font-size: 15px;
-}
-
-.section:hover .section-icon.unset {
-  opacity: 1;
-}
-
-.section-icon:hover {
-  background: var(--wash);
+  gap: 12px;
+  margin-bottom: 13px;
+  min-height: 16px;
 }
 
 .section-name {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-}
-
-/* One pip per server, lit when it's up. Reads at a glance and drops another
-   boxed badge off the page. */
-.section-pips {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 2px;
-}
-
-.section-pips i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(60, 50, 35, 0.28);
-}
-
-.section-pips i.lit {
-  background: var(--butter);
-  box-shadow: none;
-}
-
-.section-pips .more {
-  font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-3);
-  margin-left: 1px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink);
+  flex: none;
+}
+
+/* The rule replaces the pip row: it says "this group ends here" without
+   putting another badge on the page. */
+.section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
 }
 
 .section-action {
-  margin-left: auto;
-  font-size: 11.5px;
-  font-weight: 560;
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   color: var(--ink-3);
-  padding: 2px 0;
-  text-underline-offset: 3px;
   opacity: 0;
   transition:
     opacity 130ms var(--ease-out),
@@ -513,9 +424,7 @@ button {
 }
 
 .section-action:hover {
-  color: var(--blue);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
+  color: var(--vermilion);
 }
 
 /* Fixed card width: they should never stretch or reflow their proportions as
@@ -523,243 +432,262 @@ button {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 232px);
-  gap: 13px;
+  gap: 14px;
 }
 
 /* ---- server card -------------------------------------------------------- */
 
 .card {
   position: relative;
+  overflow: hidden;
   text-align: left;
-  border-radius: 14px;
-  padding: 14px 15px 13px;
-  background-color: var(--card);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
+  min-height: 118px;
+  padding: 13px 15px 12px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 14px;
-  min-height: 104px;
-  overflow: hidden;
+  gap: 10px;
   touch-action: none; /* the pointer-driven drag owns this gesture */
   transition:
-    box-shadow 150ms var(--ease-out),
-    transform 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
     background 150ms var(--ease-out);
 }
 
 .card:hover {
-  box-shadow: var(--shadow-2), inset 0 0 0 1px var(--line-firm);
-  transform: translateY(-1px);
-  filter: brightness(1.022);
+  border-color: var(--line-control);
+}
+
+/* A stopped server steps back: paler paper, greyer name, no ring. */
+.card:not(.live) {
+  background: var(--card-idle);
 }
 
 .card.lifting {
   opacity: 0.32;
 }
 
-/* State is carried by the tint, the port and the control — not by a coloured
-   bar plus a dot, which is two badges for one fact. */
-.card.live {
-  background-image: linear-gradient(160deg, rgba(255, 238, 197, 0.72), rgba(255, 251, 240, 0.2) 68%);
-}
-
-.card.broken {
-  background-image: linear-gradient(160deg, rgba(248, 217, 208, 0.7), rgba(255, 251, 245, 0.2) 68%);
-}
-
-/* Glazed ceramic with an embossed olive branch, laid in as its own layer and
-   dissolved toward the left. Text keeps a clean field, the relief stays a
-   corner motif, and the artwork's own edge never reads as a seam. */
-.card::after {
-  content: '';
+/* The per-server signature. Pitch varies by server id, which is the variety
+   the maiolica tiles used to provide. Running servers only. */
+.card-rings {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-image: var(--ceramic);
-  background-size: cover;
-  background-position: right bottom;
-  background-repeat: no-repeat;
-  mask-image: linear-gradient(to left, #000 0 30%, transparent 82%);
-  -webkit-mask-image: linear-gradient(to left, #000 0 30%, transparent 82%);
-  opacity: 0.82;
+  right: -40px;
+  bottom: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background-image: repeating-radial-gradient(
+    circle at 50% 50%,
+    var(--vermilion) 0 1.5px,
+    transparent 1.5px var(--pitch, 8px)
+  );
+  opacity: 0.5;
   pointer-events: none;
-  z-index: 0;
 }
 
-/* Content rides above the glaze. */
-.card > * {
+/* Content rides above the motif — but not the motif itself, which is
+   absolutely positioned and would be knocked back into the flex flow by a
+   blanket `position: relative` on every child. */
+.card > *:not(.card-rings) {
   position: relative;
   z-index: 1;
 }
 
 .card-top {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.card-id {
+  flex: 1;
   min-width: 0;
 }
 
 .card-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13.5px;
-  font-weight: 640;
-  letter-spacing: -0.008em;
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* A small physical button rather than a slab CTA — four identical full-width
-   pills in a grid is the thing that reads as a template. */
-.card-action {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--ink);
-  background: var(--card-lift);
-  box-shadow: inset 0 0 0 1px rgba(60, 50, 35, 0.2);
-  transition:
-    background 140ms var(--ease-out),
-    color 140ms var(--ease-out),
-    box-shadow 140ms var(--ease-out),
-    transform 140ms var(--ease-out);
+.card:not(.live) .card-name {
+  color: var(--ink-2);
 }
 
-.card-action svg {
-  width: 11px;
-  height: 11px;
-}
-
-/* Optical centring: a triangle reads left-heavy inside a circle. */
-.card-action.start svg {
-  margin-left: 1.5px;
-}
-
-.card-action:hover {
-  background: var(--blue);
-  color: #fff;
-  box-shadow: none;
-  transform: scale(1.07);
-}
-
-.card.live .card-action:hover {
-  background: var(--clay);
-}
-
-.card-action:active {
-  transform: scale(0.93);
-}
-
-.card-body {
+/* The branch rides on the card so the grid answers "which worktree" without
+   a drill-in. Only rendered when there is more than one to be in. */
+.card-branch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-2);
   min-width: 0;
 }
 
-.card-port {
-  font-family: var(--mono);
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: -0.05em;
-  line-height: 1;
-  color: var(--blue);
-  display: block;
+.card-branch .glyph {
+  flex: none;
+  color: var(--vermilion);
 }
 
-.colon {
-  opacity: 0.38;
-  font-size: 0.76em;
+.card-branch .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-action {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  border: 1px solid var(--line-control);
+  color: var(--ink);
+  transition:
+    background 130ms var(--ease-out),
+    border-color 130ms var(--ease-out),
+    color 130ms var(--ease-out);
+}
+
+.card-action svg {
+  width: 8px;
+  height: 8px;
+}
+
+.card.live .card-action:hover {
+  background: var(--vermilion);
+  border-color: var(--vermilion);
+  color: #fff;
+}
+
+.card:not(.live) .card-action:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ground);
+}
+
+.card-port {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+}
+
+/* Where a port would be, when there isn't one. */
+.card-dash {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-4);
+}
+
+.card:not(.live) .card-dash {
+  color: rgba(26, 24, 21, 0.22);
 }
 
 .card-meta {
-  margin-top: 5px;
-  font-size: 11.5px;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--ink-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.card-meta.bad {
-  color: var(--clay);
+.card:not(.live) .card-meta {
+  color: rgba(26, 24, 21, 0.38);
+}
+
+/* Needs to outrank the idle-card rule above, which is more specific and would
+   otherwise grey out an exit code on a card that is by definition not live. */
+.card .card-meta.bad {
+  color: var(--vermilion);
 }
 
 /* ---- buttons ------------------------------------------------------------ */
 
+/* One button, three weights: solid ink, outline, and text only. All square. */
 .btn {
-  border-radius: 7px;
-  padding: 6px 13px;
-  font-size: 12px;
-  font-weight: 560;
-  letter-spacing: -0.002em;
-  color: var(--ink);
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: inset 0 0 0 1px var(--line-firm);
+  color: var(--ink);
+  border: 1px solid var(--line-control);
+  background: var(--card);
   transition:
-    transform 130ms var(--ease-out),
-    box-shadow 130ms var(--ease-out),
     background 130ms var(--ease-out),
+    border-color 130ms var(--ease-out),
     color 130ms var(--ease-out);
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--card-lift);
-  box-shadow: inset 0 0 0 1px rgba(60, 50, 35, 0.26);
-}
-
-/* Instant, physical feedback — the control gives under the press. */
-.btn:active:not(:disabled) {
-  transform: scale(0.975);
-  background: var(--wash);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ground);
 }
 
 .btn:disabled {
   opacity: 0.4;
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .btn.primary {
-  color: #fff;
-  background: var(--blue);
-  box-shadow: none;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ground);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: #34527a;
-  box-shadow: none;
-}
-
-.btn.primary:active:not(:disabled) {
-  background: #2c4668;
+  background: var(--vermilion);
+  border-color: var(--vermilion);
+  color: #fff;
 }
 
 .btn.quiet {
   background: none;
-  box-shadow: none;
-  color: var(--ink-2);
+  border-color: transparent;
+  color: var(--ink-3);
 }
 
 .btn.quiet:hover:not(:disabled) {
-  background: var(--wash);
-  box-shadow: none;
+  background: none;
+  border-color: transparent;
   color: var(--ink);
 }
 
 .btn.danger {
-  color: var(--clay);
+  background: none;
+  border-color: transparent;
+  color: var(--vermilion);
 }
 
 .btn.danger:hover:not(:disabled) {
-  background: var(--clay-wash);
+  background: none;
+  border-color: transparent;
+  color: var(--vermilion);
+  opacity: 0.65;
 }
 
 .btn.small {
-  padding: 4.5px 11px;
-  font-size: 11.5px;
+  padding: 7px 15px;
 }
 
 .btn.wide {
@@ -769,31 +697,22 @@ button {
 
 /* ---- status ------------------------------------------------------------- */
 
+/* A filled square, not a dot — the only round things here are the discs. */
 .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 9px;
+  height: 9px;
   flex: none;
+  background: var(--ink-4);
 }
 
-.dot.running {
-  background: var(--butter);
-  box-shadow: 0 0 0 2.5px var(--butter-wash);
+.dot.running,
+.dot.crashed {
+  background: var(--vermilion);
 }
 
 .dot.starting {
-  background: var(--butter);
+  background: var(--vermilion);
   animation: pulse 1.3s var(--ease-in-out) infinite;
-}
-
-.dot.crashed {
-  background: var(--clay);
-  box-shadow: 0 0 0 2.5px var(--clay-wash);
-}
-
-.dot.stopped {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--ink-3);
 }
 
 @keyframes pulse {
@@ -817,32 +736,21 @@ button {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-radius: 5px;
-  padding: 2.5px 9px 2.5px 8px;
-  font-size: 10.5px;
-  font-weight: 640;
-  letter-spacing: 0.03em;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  background: var(--wash);
-  color: var(--ink-2);
-}
-
-.chip.running,
-.chip.starting {
-  background: var(--butter-wash);
-  color: #8a6410;
-}
-
-.chip.crashed {
-  background: var(--clay-wash);
-  color: var(--clay);
+  color: var(--ink);
 }
 
 .chip.agent {
-  background: var(--blue-wash);
-  color: var(--blue);
-  padding: 2.5px 9px;
+  gap: 0;
+  padding: 3px 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--ink-2);
+  border: 1px solid rgba(26, 24, 21, 0.24);
 }
 
 /* The ghost that follows the cursor while dragging a card. */
@@ -850,20 +758,21 @@ button {
   position: fixed;
   z-index: 200;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  border-radius: 12px;
-  background: var(--card-lift);
-  box-shadow: var(--shadow-3), inset 0 0 0 1px var(--line-firm);
-  font-size: 12.5px;
-  font-weight: 640;
-  transform: translate(-18px, -50%) rotate(-2deg);
+  padding: 9px 14px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: translate(-18px, -50%);
 }
 
 .drop-note {
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   color: var(--ink-3);
   padding: 8px 2px 4px;
 }
@@ -871,115 +780,116 @@ button {
 /* ---- detail ------------------------------------------------------------- */
 
 .detail-head {
-  padding: 0 30px 16px;
+  padding: 2px 34px 16px;
 }
 
 .back {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 560;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--ink-3);
-  padding: 4px 10px 4px 7px;
-  margin: 0 0 12px -7px;
-  border-radius: 7px;
-  transition:
-    background 130ms var(--ease-out),
-    color 130ms var(--ease-out);
+  margin-bottom: 12px;
+  transition: color 130ms var(--ease-out);
+}
+
+.back svg {
+  width: 11px;
+  height: 11px;
 }
 
 .back:hover {
-  background: var(--wash);
   color: var(--ink);
 }
 
 .detail-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   min-width: 0;
 }
 
 .detail-title h1 {
-  font-family: var(--display);
-  font-size: 26px;
-  font-weight: 680;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* The only reversed port in the app, and the only place the port is also a
+   button — so it earns the ink block. */
 .detail-port {
   margin-left: auto;
-  font-family: var(--mono);
-  font-size: 25px;
-  font-weight: 500;
-  letter-spacing: -0.045em;
+  flex: none;
+  padding: 7px 13px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 22px;
+  font-weight: 700;
   line-height: 1;
-  color: var(--blue);
-  padding: 4px 10px;
-  border-radius: 10px;
-  transition:
-    background 130ms var(--ease-out),
-    transform 130ms var(--ease-out);
+  letter-spacing: -0.04em;
+  transition: background 130ms var(--ease-out);
 }
 
 .detail-port:hover {
-  background: var(--blue-wash);
-}
-
-.detail-port:active {
-  transform: scale(0.97);
+  background: var(--vermilion);
 }
 
 .detail-meta {
   margin-top: 9px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--ink-2);
   user-select: text;
 }
 
 .detail-meta .sep {
-  color: var(--ink-3);
-  opacity: 0.6;
+  opacity: 0.4;
 }
 
 .path-btn {
   font: inherit;
   color: var(--ink-2);
-  border-radius: 4px;
-  transition: color 120ms var(--ease-out);
+  max-width: 44ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 130ms var(--ease-out);
 }
 
 .path-btn:hover {
-  color: var(--blue);
+  color: var(--vermilion);
 }
 
 .detail-tools {
   display: flex;
-  gap: 7px;
+  gap: 8px;
   align-items: center;
   margin-top: 16px;
 }
 
 /* ---- the log well ------------------------------------------------------- */
 
+/* The log is the reason this screen exists, so it takes everything below the
+   header — and the ruling stops at its edge. The field is a ground; paper you
+   read from should be plain. */
 .well {
   flex: 1;
   min-height: 0;
-  margin: 0 30px 26px;
-  border-radius: 14px;
+  margin: 0 34px 26px;
   background: var(--card);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
+  border: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -990,21 +900,21 @@ button {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 9px 10px 8px 15px;
-  border-bottom: 1px solid var(--line);
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid rgba(26, 24, 21, 0.14);
 }
 
 .well-title {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink);
 }
 
 .well-count {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--ink-3);
 }
 
@@ -1018,7 +928,7 @@ button {
   line-height: 1.62;
   user-select: text;
   cursor: text;
-  color: #35322b;
+  color: rgba(26, 24, 21, 0.88);
 }
 
 .log-line {
@@ -1027,7 +937,7 @@ button {
 }
 
 .log-line.stderr {
-  color: var(--clay);
+  color: var(--vermilion);
 }
 
 .log-line.system {
@@ -1052,9 +962,8 @@ button {
   gap: 14px;
   text-align: center;
   padding: 52px 40px;
-  border-radius: 16px;
   background: var(--card);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
+  border: 1px solid var(--hairline);
 }
 
 .empty img {
@@ -1063,10 +972,9 @@ button {
 }
 
 .empty h2 {
-  font-family: var(--display);
   font-size: 20px;
-  font-weight: 660;
-  letter-spacing: -0.024em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   margin: 0;
 }
 
@@ -1083,38 +991,49 @@ button {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(45, 38, 26, 0.26);
-  backdrop-filter: blur(4px);
+  background: rgba(26, 24, 21, 0.34);
+  backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
-  padding: 30px;
+  padding: 28px;
   animation: fade 140ms var(--ease-out);
 }
 
+/* The one element that floats, and the one that gets a full-strength rule
+   rather than a hairline. */
 .sheet {
   width: min(580px, 100%);
   max-height: 100%;
   overflow-y: auto;
   background: var(--ground);
-  border-radius: 18px;
-  box-shadow: var(--shadow-3), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--ink);
+  box-shadow: 0 18px 50px rgba(26, 24, 21, 0.28);
   animation: rise 220ms var(--ease-out);
 }
 
 .sheet-head {
-  padding: 20px 24px 0;
+  padding: 16px 22px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .sheet-head h2 {
-  font-family: var(--display);
-  font-size: 19px;
-  font-weight: 680;
-  letter-spacing: -0.024em;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   margin: 0;
+  flex: none;
+}
+
+.sheet-head .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
 }
 
 .sheet-body {
-  padding: 16px 24px 4px;
+  padding: 16px 22px 6px;
   display: grid;
   gap: 13px;
 }
@@ -1134,17 +1053,16 @@ button {
 
 .link-btn {
   margin-left: auto;
-  font-size: 11.5px;
-  font-weight: 560;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--ink-3);
-  text-underline-offset: 3px;
-  transition: color 120ms var(--ease-out);
+  transition: color 130ms var(--ease-out);
 }
 
 .link-btn:hover {
-  color: var(--blue);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
+  color: var(--vermilion);
 }
 
 .toggles {
@@ -1154,7 +1072,7 @@ button {
 }
 
 .sheet-foot {
-  padding: 18px 24px 20px;
+  padding: 16px 22px 18px;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -1181,39 +1099,30 @@ button {
   gap: 5px;
 }
 
-/* Section captions only — a .toggle is also a direct child label. */
-.field > label:not(.toggle) {
-  font-size: 10px;
+/* Section captions only — a .toggle is also a label. Descendant rather than
+   child: the Environment caption sits inside .field-head next to its action,
+   and a child selector misses it. */
+.field label:not(.toggle) {
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 
 .field input[type='text'],
-.field select,
 .env-row input {
-  font: 12.5px/1.45 var(--mono);
+  font: 400 12.5px/1.45 var(--mono);
   color: var(--ink);
   background: var(--card);
-  border: 0;
-  border-radius: 7px;
+  border: 1px solid rgba(26, 24, 21, 0.24);
   padding: 7px 10px;
   width: 100%;
   min-width: 0;
   user-select: text;
-  box-shadow: inset 0 0 0 1px var(--line-firm);
-  transition: box-shadow 130ms var(--ease-out);
-}
-
-.field select {
-  font-family: var(--ui);
-  font-weight: 530;
-  appearance: none;
-  padding-right: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239d9584' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 11px center;
+  transition:
+    border-color 130ms var(--ease-out),
+    box-shadow 130ms var(--ease-out);
 }
 
 .field input[type='text']::placeholder {
@@ -1221,12 +1130,10 @@ button {
 }
 
 .field input[type='text']:focus,
-.field select:focus,
 .env-row input:focus {
   outline: none;
-  box-shadow:
-    inset 0 0 0 1px var(--blue),
-    0 0 0 3px var(--blue-wash);
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px rgba(232, 64, 42, 0.16);
 }
 
 .hint {
@@ -1238,9 +1145,9 @@ button {
 .hint code,
 .prose code {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 400;
   background: var(--wash);
-  border-radius: 4px;
   padding: 1px 4px;
 }
 
@@ -1254,16 +1161,43 @@ button {
   flex: 1;
 }
 
+/* A square that fills in — never a rounded switch. */
 .toggle {
   display: flex;
-  gap: 9px;
+  gap: 10px;
   align-items: flex-start;
   padding: 1px 0;
 }
 
 .toggle input {
+  appearance: none;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: none;
   margin: 2px 0 0;
-  accent-color: var(--blue);
+  border: 1px solid rgba(26, 24, 21, 0.35);
+  background: none;
+  transition:
+    background 130ms var(--ease-out),
+    border-color 130ms var(--ease-out);
+}
+
+.toggle input:checked {
+  background: var(--vermilion);
+  border-color: var(--vermilion);
+}
+
+.toggle input:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1px;
+  width: 3px;
+  height: 7px;
+  border: solid var(--ground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(43deg);
 }
 
 .toggle span {
@@ -1279,24 +1213,22 @@ button {
 }
 
 .error {
-  color: var(--clay);
+  color: var(--vermilion);
   font-size: 12px;
-  background: var(--clay-wash);
-  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid rgba(232, 64, 42, 0.4);
   padding: 9px 11px;
-  box-shadow: inset 0 0 0 1px rgba(189, 82, 56, 0.24);
 }
 
 .notice {
   font-size: 12px;
-  color: var(--blue);
-  background: var(--blue-wash);
-  border-radius: 10px;
+  color: var(--ink-2);
+  background: var(--card);
+  border: 1px solid var(--hairline);
   padding: 9px 11px;
   white-space: pre-wrap;
   user-select: text;
   line-height: 1.5;
-  box-shadow: inset 0 0 0 1px rgba(61, 95, 138, 0.22);
 }
 
 .env-list {
@@ -1311,233 +1243,24 @@ button {
   align-items: center;
 }
 
+.env-row input {
+  font-size: 12px;
+}
+
 .icon-btn {
   color: var(--ink-3);
-  border-radius: 6px;
-  width: 24px;
-  height: 24px;
-  font-size: 16px;
+  width: 20px;
+  height: 20px;
+  font-size: 15px;
   line-height: 1;
-  transition:
-    background 120ms var(--ease-out),
-    color 120ms var(--ease-out);
+  transition: color 130ms var(--ease-out);
 }
 
 .icon-btn:hover {
-  background: var(--wash);
-  color: var(--clay);
+  color: var(--vermilion);
 }
 
-/* ---- icon palette ------------------------------------------------------- */
-
-.icon-pop {
-  position: absolute;
-  z-index: 60;
-  top: 24px;
-  left: 0;
-  padding: 8px;
-  border-radius: 13px;
-  background: var(--card-lift);
-  box-shadow: var(--shadow-3), inset 0 0 0 1px var(--line-firm);
-  /* Anchored to the swatch it came from, so it scales out of its trigger. */
-  transform-origin: top left;
-  animation: pop 160ms var(--ease-out);
-}
-
-@keyframes pop {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-}
-
-.icon-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 26px);
-  gap: 2px;
-}
-
-.icon-choice {
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  line-height: 1;
-  border-radius: 7px;
-  transition:
-    background 100ms var(--ease-out),
-    transform 100ms var(--ease-out);
-}
-
-.icon-choice:hover {
-  background: var(--wash);
-}
-
-.icon-choice:active {
-  transform: scale(0.9);
-}
-
-.icon-choice.current {
-  background: var(--blue-wash);
-  box-shadow: inset 0 0 0 1px var(--blue);
-}
-
-/* ---- agents panel ------------------------------------------------------- */
-
-.prose {
-  color: var(--ink-2);
-  font-size: 12.5px;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.code {
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.65;
-  background: var(--card);
-  color: #35322b;
-  border-radius: 10px;
-  padding: 11px 13px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  user-select: text;
-  margin: 0;
-  overflow-x: auto;
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-/* ---- settings ----------------------------------------------------------- */
-
-.panel {
-  border-radius: 14px;
-  padding: 20px 22px;
-  margin-bottom: 18px;
-  background: var(--card);
-  box-shadow: var(--shadow-1), inset 0 0 0 1px var(--line);
-  display: grid;
-  gap: 13px;
-}
-
-.panel-title {
-  font-family: var(--display);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.012em;
-  margin: 0;
-}
-
-.panel-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.panel-row > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.panel-label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 640;
-  margin-bottom: 3px;
-}
-
-/* ---- select ------------------------------------------------------------- */
-
-.select {
-  position: relative;
-}
-
-.select-trigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: 12.5px/1.45 var(--ui);
-  font-weight: 530;
-  color: var(--ink);
-  background: var(--card);
-  border-radius: 7px;
-  padding: 7px 10px;
-  box-shadow: inset 0 0 0 1px var(--line-firm);
-  transition: box-shadow 130ms var(--ease-out);
-}
-
-.select-trigger svg {
-  width: 11px;
-  height: 11px;
-  margin-left: auto;
-  color: var(--ink-3);
-  flex: none;
-}
-
-.select-trigger:hover {
-  box-shadow: inset 0 0 0 1px rgba(60, 50, 35, 0.26);
-}
-
-.select-trigger.open {
-  box-shadow:
-    inset 0 0 0 1px var(--blue),
-    0 0 0 3px var(--blue-wash);
-}
-
-.select-value {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.select-menu {
-  position: absolute;
-  z-index: 70;
-  top: calc(100% + 5px);
-  left: 0;
-  right: 0;
-  padding: 4px;
-  border-radius: 9px;
-  background: var(--card-lift);
-  box-shadow: var(--shadow-3), inset 0 0 0 1px var(--line-firm);
-  display: grid;
-  gap: 1px;
-  /* Scales out of the control it came from, not the middle of the screen. */
-  transform-origin: top center;
-  animation: pop 130ms var(--ease-out);
-}
-
-.select-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  font-size: 12.5px;
-  font-weight: 520;
-  color: var(--ink);
-  padding: 6px 9px;
-  border-radius: 6px;
-  transition: background 100ms var(--ease-out);
-}
-
-.select-option svg {
-  width: 11px;
-  height: 11px;
-  margin-left: auto;
-  color: var(--blue);
-  flex: none;
-}
-
-.select-option:hover {
-  background: var(--wash);
-}
-
-.select-option.on {
-  color: var(--blue);
-}
-
-/* ---- tile preview ------------------------------------------------------- */
+/* ---- ring signature ----------------------------------------------------- */
 
 .bottom-row {
   display: grid;
@@ -1557,37 +1280,203 @@ button {
   text-align: center;
 }
 
+/* The same motif the running cards carry, at the pitch this server will use. */
 .tile-preview {
+  position: relative;
+  overflow: hidden;
   width: 116px;
   height: 62px;
-  border-radius: 8px;
-  background-color: var(--card);
-  background-size: cover;
-  background-position: right bottom;
-  background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 1px var(--line-firm);
-  transition:
-    box-shadow 130ms var(--ease-out),
-    transform 130ms var(--ease-out);
+  background: var(--card);
+  border: 1px solid rgba(26, 24, 21, 0.24);
+  transition: border-color 130ms var(--ease-out);
+}
+
+.tile-preview::after {
+  content: '';
+  position: absolute;
+  right: -26px;
+  bottom: -26px;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background-image: repeating-radial-gradient(
+    circle at 50% 50%,
+    var(--vermilion) 0 1.5px,
+    transparent 1.5px var(--pitch, 8px)
+  );
+  opacity: 0.6;
 }
 
 .tile-preview:hover {
-  box-shadow: inset 0 0 0 1px rgba(60, 50, 35, 0.26);
-}
-
-.tile-preview:active {
-  transform: scale(0.99);
+  border-color: var(--ink);
 }
 
 .version {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--ink-3);
-  background: var(--wash);
-  border-radius: 6px;
+  border: 1px solid rgba(26, 24, 21, 0.18);
   padding: 3px 8px;
   user-select: text;
   white-space: nowrap;
+}
+
+/* ---- agents panel ------------------------------------------------------- */
+
+.prose {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-width: 74ch;
+  margin: 0;
+}
+
+.code {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.62;
+  background: var(--tint);
+  color: rgba(26, 24, 21, 0.88);
+  border: 1px solid rgba(26, 24, 21, 0.12);
+  padding: 10px 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  margin: 0;
+  overflow-x: auto;
+}
+
+/* ---- settings ----------------------------------------------------------- */
+
+.panel {
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  display: grid;
+  gap: 13px;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.panel-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.panel-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+/* ---- select ------------------------------------------------------------- */
+
+.select {
+  position: relative;
+}
+
+.select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 12.5px/1.45 var(--ui);
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid rgba(26, 24, 21, 0.24);
+  padding: 7px 10px;
+  transition:
+    border-color 130ms var(--ease-out),
+    box-shadow 130ms var(--ease-out);
+}
+
+.select-trigger svg {
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.select-trigger:hover {
+  border-color: var(--line-control);
+}
+
+.select-trigger.open {
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px rgba(232, 64, 42, 0.16);
+}
+
+.select-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.select-menu {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 12px 30px rgba(26, 24, 21, 0.18);
+  display: grid;
+  gap: 1px;
+  transform-origin: top center;
+  animation: pop 130ms var(--ease-out);
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink);
+  padding: 6px 9px;
+  transition: background 100ms var(--ease-out);
+}
+
+.select-option svg {
+  width: 11px;
+  height: 11px;
+  margin-left: auto;
+  color: var(--vermilion);
+  flex: none;
+}
+
+.select-option:hover {
+  background: var(--wash);
+}
+
+.select-option.on {
+  color: var(--vermilion);
 }
 
 /* ---- worktree switcher -------------------------------------------------- */
@@ -1603,25 +1492,27 @@ button {
   gap: 5px;
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--blue);
-  background: var(--blue-wash);
-  border-radius: 6px;
+  font-weight: 400;
+  color: var(--ink);
+  background: none;
+  border: 1px solid rgba(26, 24, 21, 0.24);
   padding: 2px 7px;
   max-width: 26ch;
   transition:
-    background 120ms var(--ease-out),
-    box-shadow 120ms var(--ease-out);
+    border-color 130ms var(--ease-out),
+    color 130ms var(--ease-out);
 }
 
 .branch-btn svg {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   flex: none;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .branch-glyph {
-  opacity: 0.65;
+  color: var(--vermilion);
+  flex: none;
 }
 
 .branch-name {
@@ -1632,7 +1523,8 @@ button {
 
 .branch-btn:hover:not(:disabled),
 .branch-btn.open {
-  box-shadow: inset 0 0 0 1px rgba(61, 95, 138, 0.35);
+  border-color: var(--vermilion);
+  color: var(--vermilion);
 }
 
 .branch-btn:disabled {
@@ -1646,10 +1538,10 @@ button {
   z-index: 70;
   width: 300px;
   overflow-y: auto;
-  padding: 4px;
-  border-radius: 10px;
-  background: var(--card-lift);
-  box-shadow: var(--shadow-3), inset 0 0 0 1px var(--line-firm);
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 12px 30px rgba(26, 24, 21, 0.18);
   transform-origin: top left;
   animation: pop 130ms var(--ease-out);
 }
@@ -1670,9 +1562,9 @@ button {
   text-align: left;
   font-family: var(--mono);
   font-size: 11.5px;
+  font-weight: 400;
   color: var(--ink);
   padding: 6px 9px;
-  border-radius: 6px;
   transition: background 100ms var(--ease-out);
 }
 
@@ -1688,7 +1580,7 @@ button {
   width: 11px;
   height: 11px;
   flex: none;
-  color: var(--blue);
+  color: var(--vermilion);
 }
 
 .branch-option:hover {
@@ -1696,18 +1588,17 @@ button {
 }
 
 .branch-option.on {
-  color: var(--blue);
+  color: var(--vermilion);
 }
 
 .branch-tag {
   font-family: var(--ui);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a6410;
-  background: var(--butter-wash);
-  border-radius: 4px;
+  color: var(--ink-3);
+  border: 1px solid rgba(26, 24, 21, 0.18);
   padding: 1px 5px;
   flex: none;
 }

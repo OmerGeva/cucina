@@ -112,8 +112,6 @@ export const api = {
   worktrees: (id: string) => invoke<Worktree[]>('list_worktrees', { id }),
   switchWorktree: (id: string, path: string) =>
     invoke<void>('switch_worktree', { id, path }),
-  setGroupIcon: (name: string, icon: string) =>
-    invoke<void>('set_group_icon', { name, icon }),
   logs: (id: string, tail = 500) => invoke<LogLine[]>('read_logs', { id, tail }),
   clearLogs: (id: string) => invoke<void>('clear_logs', { id }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),
@@ -145,6 +143,14 @@ export function uptime(since: number, now: number): string {
   const m = Math.floor((secs % 3600) / 60)
   return m ? `${h}h ${m}m` : `${h}h`
 }
+
+const SPELLED = [
+  'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+  'eight', 'nine', 'ten', 'eleven', 'twelve',
+]
+
+/** Small counts read better spelled out in the hero caption. */
+export const spell = (n: number) => (n < SPELLED.length ? SPELLED[n] : String(n))
 
 export function originLabel(origin?: Origin | null): string | null {
   if (!origin || origin.kind !== 'agent') return null

@@ -5,8 +5,8 @@
 // writes the two monochrome template images macOS needs for the menu bar,
 // because those must be pure black + alpha and readable at 18pt.
 //
-//   src-tauri/icons/tray-idle.png     nothing running  (outlined farfalle)
-//   src-tauri/icons/tray-active.png   something running (filled farfalle)
+//   src-tauri/icons/tray-idle.png     nothing running  (outlined disc)
+//   src-tauri/icons/tray-active.png   something running (filled disc)
 
 import zlib from 'node:zlib'
 import fs from 'node:fs'
@@ -85,45 +85,40 @@ function render(size, inside) {
   return out
 }
 
-// ---- the farfalle ---------------------------------------------------------
+// ---- the sun --------------------------------------------------------------
 
 /**
- * A bow of pasta on the 36-unit grid: pinched at the waist, widening to two
- * ruffled ends. `scale` shrinks the whole form, which is how the outlined
- * variant is produced (full shape minus a smaller copy of itself).
+ * A disc sitting on a rule. `scale` shrinks the disc, which is how the outlined
+ * variant is produced (full circle minus a smaller copy of itself).
  */
-function farfalle(scale = 1) {
+function disc(scale = 1) {
   const CX = 18
-  const CY = 18
-  const W = 15.4 * scale // half-width
-  const WAIST = 2.15 * scale // half-height at the pinch
-  const WING = 9.4 * scale // half-height at the ends
-  const RUFFLE = 1.15 * scale // depth of the edge scallops
-
+  const CY = 17
+  const R = 9.5 * scale
   return (x, y) => {
     const dx = x - CX
     const dy = y - CY
-
-    // Ruffled outer edge: the ends scallop up and down.
-    const edge = W - RUFFLE * (0.5 - 0.5 * Math.cos((dy / WING) * Math.PI * 2.6))
-    if (Math.abs(dx) > edge) return false
-
-    // Waist-to-wing profile. The exponent keeps the pinch tight and lets the
-    // wings flare late, which is what reads as "bow" rather than "triangle".
-    const t = Math.min(1, Math.abs(dx) / W)
-    const half = WAIST + (WING - WAIST) * Math.pow(t, 0.62)
-    return Math.abs(dy) <= half
+    return dx * dx + dy * dy <= R * R
   }
+}
+
+/** The horizon. Full-width, so the mark keeps its footprint when idle. */
+function horizon(x, y) {
+  return x >= 4 && x <= 32 && y >= 26 && y <= 28.5
 }
 
 function trayMark(filled) {
   const S = 36 // 18pt at 2x
-  const outer = farfalle(1)
-  if (filled) return encodePNG(S, S, render(S, outer))
+  const outer = disc(1)
+  if (filled) return encodePNG(S, S, render(S, (x, y) => outer(x, y) || horizon(x, y)))
 
-  // Outline: the shape with a slightly smaller copy knocked out of it.
-  const inner = farfalle(0.76)
-  return encodePNG(S, S, render(S, (x, y) => outer(x, y) && !inner(x, y)))
+  // Idle: the disc as a ring, the rule still solid.
+  const inner = disc(0.68)
+  return encodePNG(
+    S,
+    S,
+    render(S, (x, y) => (outer(x, y) && !inner(x, y)) || horizon(x, y)),
+  )
 }
 
 fs.mkdirSync(OUT, { recursive: true })

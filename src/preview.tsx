@@ -10,7 +10,7 @@ import type { LogLine, ServerView } from './api'
 import './fonts.css'
 import './styles.css'
 
-const HOME = '/Users/omergeva'
+const HOME = '/Users/you'
 const since = (mins: number) => Date.now() - mins * 60_000
 
 const server = (
@@ -23,19 +23,19 @@ const server = (
 
 const VIEWS: ServerView[] = [
   {
-    server: server('demo', 'Demo', `${HOME}/code/demo`, 'python3 -m http.server 8931', ''),
+    server: server('docs', 'Docs', `${HOME}/code/docs`, 'python3 -m http.server 8931', ''),
     status: { id: 'demo', state: 'stopped', restarts: 0 },
   },
   {
     server: server(
-      'acme-api',
-      'Acme API',
-      `${HOME}/code/acme/acme-api`,
+      'api',
+      'API',
+      `${HOME}/code/acme/api`,
       'make start',
       'acme',
     ),
     status: {
-      id: 'acme-api',
+      id: 'api',
       state: 'running',
       pid: 4711,
       port: 4000,
@@ -46,9 +46,9 @@ const VIEWS: ServerView[] = [
   },
   {
     server: server(
-      'acme-data-service',
-      'Acme Data Service',
-      `${HOME}/code/acme/acme-data-service`,
+      'data-service',
+      'Data Service',
+      `${HOME}/code/acme/data-service`,
       'poetry run uvicorn app:api --reload',
       'acme',
     ),
@@ -64,23 +64,23 @@ const VIEWS: ServerView[] = [
   },
   {
     server: server(
-      'acme-fe',
-      'Acme FE',
-      `${HOME}/code/acme/acme-fe`,
+      'web',
+      'Web',
+      `${HOME}/code/acme/web`,
       'make start',
       'acme',
     ),
     status: { id: 'acme-fe', state: 'starting', pid: 4713, startedAt: since(0), restarts: 0 },
   },
   {
-    server: server('acme-cms', 'Acme CMS', `${HOME}/code/acme/cms`, 'npm run dev', 'acme'),
-    status: { id: 'acme-cms', state: 'crashed', exitCode: 1, restarts: 0 },
+    server: server('cms', 'CMS', `${HOME}/code/acme/cms`, 'npm run dev', 'acme'),
+    status: { id: 'cms', state: 'crashed', exitCode: 1, restarts: 0 },
   },
 ]
 
 const LOGS: Record<string, LogLine[]> = {
-  'acme-api': [
-    'make start — in ~/code/acme/acme-api',
+  'api': [
+    'make start — in ~/code/acme/api',
     'go build -o bin/api ./cmd/api',
     'listening on http://127.0.0.1:4000',
     'migrations: 14 applied, 0 pending',
@@ -94,7 +94,7 @@ const LOGS: Record<string, LogLine[]> = {
     stream: i === 0 ? 'system' : 'stdout',
     text,
   })),
-  'acme-cms': [
+  'cms': [
     { seq: 0, ts: Date.now(), stream: 'system', text: 'npm run dev — in ~/code/acme/cms' },
     { seq: 1, ts: Date.now(), stream: 'stderr', text: 'Error: connect ECONNREFUSED 127.0.0.1:5432' },
     { seq: 2, ts: Date.now(), stream: 'stderr', text: '    at TCPConnectWrap.afterConnect [as oncomplete]' },
@@ -104,7 +104,7 @@ const LOGS: Record<string, LogLine[]> = {
 
 const RESPONSES: Record<string, unknown> = {
   list_servers: VIEWS,
-  list_groups: [{ name: 'acme', icon: '🌿' }],
+  list_groups: [{ name: 'acme', icon: '' }],
   list_worktrees: [
     { path: '/x/feat-617-claim-scope-gate', branch: 'feat-617-claim-scope-gate', isMain: true, isCurrent: false },
     { path: '/x/feat-agent-latency-trace', branch: 'feat-agent-latency-trace', isMain: false, isCurrent: false },
@@ -143,14 +143,21 @@ const RESPONSES: Record<string, unknown> = {
       console.log(`[harness] save_server ${next.id} → project "${next.group}"`)
       return next
     }
-    if (command === 'set_group_icon') {
-      console.log(`[harness] set_group_icon ${args.name} → ${args.icon}`)
-      return null
-    }
     if (command in RESPONSES) return RESPONSES[command]
     // Everything else (start/stop/listen/…) is a no-op in the harness.
     return null
   },
+}
+
+// preview.html?at=server:api | at=settings | at=project:acme
+const at = new URLSearchParams(location.search).get('at')
+if (at) {
+  const [kind, arg] = at.split(':')
+  if (kind === 'add') (window as unknown as Record<string, unknown>).__cucinaAdd = true
+  ;(window as unknown as Record<string, unknown>).__cucinaRoute =
+    kind === 'server' ? { kind: 'server', id: arg }
+    : kind === 'project' ? { kind: 'project', name: arg }
+    : { kind }
 }
 
 const { default: App } = await import('./App')

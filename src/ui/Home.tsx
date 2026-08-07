@@ -1,19 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import type { Group, ServerView } from '../api'
-import { isLive, sections } from '../api'
+import type { Group, ServerView, Worktree } from '../api'
+import { isLive, sections, spell } from '../api'
 import ServerCard from './ServerCard'
-import bigMark from '../../assets/mark-160.png'
-
-
-/** A small, deliberately Italian set — enough to tell projects apart at a
-    glance without becoming a full emoji picker. */
-const ICONS = [
-  '🍅', '🌿', '🍋', '🫒', '🍇', '🌞',
-  '🐙', '🍝', '🥖', '🧀', '☕️', '🍷',
-  '🏛', '🌊', '🔥', '🪴', '⚙️', '🧭',
-  '📦', '🛰', '🧪', '🎛', '🗄', '🔭',
-]
+import mark from '../../assets/cucina-mark.svg'
 
 /** How far the pointer must travel before a press becomes a drag. */
 const THRESHOLD = 6
@@ -29,6 +19,8 @@ interface Drag {
 interface Props {
   views: ServerView[]
   groups: Group[]
+  /** Read once in App, so a card can show its branch without fetching. */
+  trees: Map<string, Worktree[]>
   /** null shows everything grouped; a name shows just that project. */
   project: string | null
   now: number
@@ -38,13 +30,12 @@ interface Props {
   onAdd: () => void
   onGroupRun: (group: string, start: boolean) => void
   onMove: (serverId: string, group: string) => void
-  onIcon: (group: string, icon: string) => void
   onOpenPort: (port: number) => void
 }
 
 export default function Home({
   views,
-  groups,
+  trees,
   project,
   now,
   onOpen,
@@ -53,11 +44,9 @@ export default function Home({
   onAdd,
   onGroupRun,
   onMove,
-  onIcon,
   onOpenPort,
 }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null)
-  const [picker, setPicker] = useState<string | null>(null)
 
   const pending = useRef<{ id: string; name: string; x: number; y: number } | null>(null)
   const zones = useRef(new Map<string, HTMLElement>())
@@ -71,20 +60,6 @@ export default function Home({
     setDrag(next)
   }
 
-  useEffect(() => {
-    if (!picker) return
-    const close = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.icon-pop, .section-icon')) setPicker(null)
-    }
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setPicker(null)
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [picker])
-
   const zoneAt = (x: number, y: number): string | null => {
     for (const [name, el] of zones.current) {
       const r = el.getBoundingClientRect()
@@ -96,6 +71,14 @@ export default function Home({
   const zoneRef = (name: string) => (el: HTMLElement | null) => {
     if (el) zones.current.set(name, el)
     else zones.current.delete(name)
+  }
+
+  /** Only shown when there is more than one worktree to be in — the same
+      guard the switcher itself applies. */
+  const branchOf = (id: string): string | null => {
+    const list = trees.get(id) ?? []
+    if (list.length < 2) return null
+    return list.find((w) => w.isCurrent)?.branch ?? null
   }
 
   const handlers = (view: ServerView) => ({
@@ -139,22 +122,37 @@ export default function Home({
   })
 
   const scoped = project === null ? views : views.filter((v) => v.server.group === project)
-  const list = project === null
-    ? sections(views)
-    : [{ name: project, views: scoped }]
+  const list = project === null ? sections(views) : [{ name: project, views: scoped }]
   const running = scoped.filter(isLive)
   const ports = running.map((v) => v.status.port).filter((p): p is number => Boolean(p))
   const dragged = drag && views.find((v) => v.server.id === drag.id)
   const showLoose = list.some((s) => s.name === '') || Boolean(dragged?.server.group)
 
+  // Name, then a rule of empty space, then the one action. With the mark gone
+  // the wordmark starts on the same content margin as the hero and the grid
+  // below it, which is most of why the header used to feel bolted on.
+  const head = (
+    <div className="page-head">
+      <h1>{project ?? 'Cucina'}</h1>
+      <span className="spacer" />
+      {running.length ? (
+        <button
+          className="head-action"
+          onClick={() => running.forEach((v) => onStop(v.server.id))}
+          title="Stop every running server"
+        >
+          Stop all
+        </button>
+      ) : null}
+    </div>
+  )
+
   if (scoped.length === 0 && project !== null) {
     return (
       <div className="page-scroll">
-        <div className="page-head">
-          <h1>{project}</h1>
-        </div>
+        {head}
         <div className="empty">
-          <img src={bigMark} alt="" draggable={false} />
+          <img src={mark} alt="" draggable={false} />
           <h2>This project is empty</h2>
           <p>Add a server to it, or drag one in from All servers.</p>
           <button className="btn primary" onClick={onAdd}>
@@ -168,11 +166,9 @@ export default function Home({
   if (views.length === 0) {
     return (
       <div className="page-scroll">
-        <div className="page-head">
-          <h1>Cucina</h1>
-        </div>
+        {head}
         <div className="empty">
-          <img src={bigMark} alt="" draggable={false} />
+          <img src={mark} alt="" draggable={false} />
           <h2>Nothing on the heat</h2>
           <p>
             Point Cucina at a directory and a command. Starting that server then takes one click —
@@ -189,30 +185,17 @@ export default function Home({
   const section = (name: string, items: ServerView[]) => {
     const live = items.filter(isLive).length
     const allLive = live === items.length
-    const icon = groups.find((g) => g.name === name)?.icon ?? ''
     return (
       <section
         key={name || ' loose'}
         ref={zoneRef(name)}
         className={`section${drag?.over === name ? ' drop-over' : ''}`}
       >
+        {/* Label then a rule to the far margin — it says where the group ends
+            without putting another badge on the page. */}
         <header className="section-head">
-          {name ? (
-            <button
-              className={`section-icon${icon ? '' : ' unset'}`}
-              title={icon ? 'Change icon' : 'Give this project an icon'}
-              onClick={() => setPicker(picker === name ? null : name)}
-            >
-              {icon || '+'}
-            </button>
-          ) : null}
           <span className="section-name">{name || 'No project'}</span>
-          <span className="section-pips" title={`${live} of ${items.length} running`}>
-            {items.slice(0, 8).map((v, i) => (
-              <i key={v.server.id} className={i < live ? 'lit' : undefined} />
-            ))}
-            {items.length > 8 ? <span className="more">+{items.length - 8}</span> : null}
-          </span>
+          <span className="section-rule" />
           {name && items.length ? (
             <button
               className="section-action"
@@ -224,30 +207,12 @@ export default function Home({
           ) : null}
         </header>
 
-        {picker === name ? (
-          <div className="icon-pop">
-            <div className="icon-grid">
-              {ICONS.map((glyph) => (
-                <button
-                  key={glyph}
-                  className={`icon-choice${glyph === icon ? ' current' : ''}`}
-                  onClick={() => {
-                    onIcon(name, glyph === icon ? '' : glyph)
-                    setPicker(null)
-                  }}
-                >
-                  {glyph}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div className="grid">
           {items.map((view) => (
             <ServerCard
               key={view.server.id}
               view={view}
+              branch={branchOf(view.server.id)}
               now={now}
               lifting={drag?.id === view.server.id}
               onOpen={() => onOpen(view.server.id)}
@@ -267,59 +232,34 @@ export default function Home({
 
   return (
     <div className="page-scroll">
-      <div className="page-head">
-        {project ? (
-          <>
-            <span className="page-emoji">
-              {groups.find((g) => g.name === project)?.icon ?? ''}
-            </span>
-            <h1>{project}</h1>
-          </>
-        ) : (
-          <>
-            <img className="page-mark" src={bigMark} alt="" draggable={false} />
-            <h1>Cucina</h1>
-          </>
-        )}
-        <span className="sub">
-          {scoped.length} server{scoped.length === 1 ? '' : 's'}
-        </span>
-      </div>
+      {head}
 
-      <div className={`hero${running.length ? ' warm' : ''}`}>
+      <div className="hero">
+        {/* A field of concentric hairlines, and the one solid disc in the app
+            sitting off-centre inside it. */}
+        <span className="hero-field" aria-hidden />
+        <span className="hero-disc" aria-hidden />
+
         <div className="hero-body">
-          <h2 className="hero-count">
-            {running.length ? `${running.length} running` : 'Nothing running'}
-          </h2>
-          {ports.length ? (
-            <div className="hero-ports">
-              {ports.map((port) => (
-                <button
-                  key={port}
-                  className="port-pill"
-                  onClick={() => onOpenPort(port)}
-                  title={`Open localhost:${port}`}
-                >
-                  :{port}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="hero-caption">
-              Everything is off. Start a server here, from the menu bar, or by handing it to a
-              coding agent.
-            </p>
-          )}
+          <h2 className="hero-count">{running.length}</h2>
+          <span className="hero-word">running</span>
         </div>
-        {running.length ? (
-          <button
-            className="btn"
-            onClick={() => running.forEach((v) => onStop(v.server.id))}
-            title="Stop every running server"
-          >
-            Stop all
-          </button>
-        ) : null}
+
+        <div className="hero-foot">
+          {ports.map((port) => (
+            <button
+              key={port}
+              className="port-pill"
+              onClick={() => onOpenPort(port)}
+              title={`Open localhost:${port}`}
+            >
+              :{port}
+            </button>
+          ))}
+          <p className="hero-caption">
+            of {spell(scoped.length)} server{scoped.length === 1 ? '' : 's'}
+          </p>
+        </div>
       </div>
 
       {project !== null ? (
@@ -328,6 +268,7 @@ export default function Home({
             <ServerCard
               key={view.server.id}
               view={view}
+              branch={branchOf(view.server.id)}
               now={now}
               lifting={false}
               onOpen={() => onOpen(view.server.id)}

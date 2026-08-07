@@ -3,7 +3,7 @@
 //! Rebuilt only when a status actually changes — never on a timer, and never
 //! for log output.
 
-use cucina_core::model::{Group, Origin, State};
+use cucina_core::model::{Origin, State};
 use cucina_core::proto::ServerView;
 use cucina_core::Supervisor;
 use std::sync::Arc;
@@ -78,15 +78,17 @@ fn toggle_item<R: Runtime>(app: &AppHandle<R>, view: &ServerView) -> tauri::Resu
     )
 }
 
-fn build_menu<R: Runtime>(
-    app: &AppHandle<R>,
-    views: &[ServerView],
-    groups: &[Group],
-) -> tauri::Result<Menu<R>> {
+fn build_menu<R: Runtime>(app: &AppHandle<R>, views: &[ServerView]) -> tauri::Result<Menu<R>> {
     let menu = Menu::new(app)?;
 
     if views.is_empty() {
-        let empty = MenuItem::with_id(app, "noop", "Nothing in the kitchen yet", false, None::<&str>)?;
+        let empty = MenuItem::with_id(
+            app,
+            "noop",
+            "Nothing in the kitchen yet",
+            false,
+            None::<&str>,
+        )?;
         menu.append(&empty)?;
     } else {
         // Ungrouped servers sit at the top level; a project's services collapse
@@ -107,16 +109,10 @@ fn build_menu<R: Runtime>(
             let members: Vec<&ServerView> =
                 views.iter().filter(|v| v.server.group == group).collect();
             let live = members.iter().filter(|v| v.status.state.is_live()).count();
-            let icon = groups
-                .iter()
-                .find(|g| g.name == group)
-                .map(|g| g.icon.as_str())
-                .unwrap_or_default();
-            let titled = if icon.is_empty() {
-                group.to_string()
-            } else {
-                format!("{icon}  {group}")
-            };
+            // The project emoji went with the redesign — there is no longer
+            // anywhere in the app to set one, so a leftover glyph here would
+            // be unchangeable. The field stays on the record; nothing reads it.
+            let titled = group.to_string();
             let heading = if live > 0 {
                 format!("{titled}   {live}/{} on", members.len())
             } else {
@@ -164,7 +160,7 @@ fn build_menu<R: Runtime>(
 
 pub fn create<R: Runtime>(app: &AppHandle<R>, sup: Arc<Supervisor>) -> tauri::Result<TrayIcon<R>> {
     let views = views(&sup);
-    let menu = build_menu(app, &views, &sup.groups())?;
+    let menu = build_menu(app, &views)?;
 
     let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(Image::from_bytes(IDLE_ICON)?)
@@ -190,9 +186,11 @@ pub fn views(sup: &Arc<Supervisor>) -> Vec<ServerView> {
 /// Redraw the menu and the icon. Cheap, but only called on real state changes.
 pub fn refresh<R: Runtime>(app: &AppHandle<R>, sup: &Arc<Supervisor>) {
     let views = views(sup);
-    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
 
-    if let Ok(menu) = build_menu(app, &views, &sup.groups()) {
+    if let Ok(menu) = build_menu(app, &views) {
         let _ = tray.set_menu(Some(menu));
     }
 
@@ -206,7 +204,11 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>, sup: &Arc<Supervisor>) {
     // has to be an empty string: passing None reads as "leave it alone" on
     // macOS, which strands the last count in the menu bar after everything
     // stops.
-    let _ = tray.set_title(Some(if live > 0 { live.to_string() } else { String::new() }));
+    let _ = tray.set_title(Some(if live > 0 {
+        live.to_string()
+    } else {
+        String::new()
+    }));
 }
 
 fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {

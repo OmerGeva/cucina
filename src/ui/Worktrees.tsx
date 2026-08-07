@@ -6,16 +6,15 @@ import { api } from '../api'
 
 interface Props {
   serverId: string
-  /** Re-read when the server's directory changes underneath us. */
-  dir: string
+  /** Read once in App and passed down, rather than fetched again here. */
+  trees: Worktree[]
   live: boolean
   onSwitched: () => void
 }
 
 /** Branch switcher. Hidden entirely when the directory isn't a git repository
     with more than one worktree — there is nothing to switch between. */
-export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
-  const [trees, setTrees] = useState<Worktree[]>([])
+export default function Worktrees({ serverId, trees, live, onSwitched }: Props) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   /** Fixed coordinates, clamped to the window — the trigger can sit anywhere
@@ -42,16 +41,6 @@ export default function Worktrees({ serverId, dir, live, onSwitched }: Props) {
         : { left, bottom: window.innerHeight - r.top + 6, maxHeight: Math.max(140, above) },
     )
   }
-
-  useEffect(() => {
-    let stale = false
-    void api.worktrees(serverId).then((next) => {
-      if (!stale) setTrees(next)
-    })
-    return () => {
-      stale = true
-    }
-  }, [serverId, dir])
 
   useEffect(() => {
     if (!open) return
