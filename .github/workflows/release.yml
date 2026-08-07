@@ -42,7 +42,15 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update payload. Installed copies verify it against the
+          # public key compiled into them and refuse anything that does not
+          # match, so a tampered release cannot be pushed to users.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
+          # Publishes latest.json alongside the bundles — the manifest the
+          # in-app updater reads.
+          includeUpdaterJson: true
           tagName: ${{ github.ref_name }}
           releaseName: Cucina ${{ github.ref_name }}
           releaseDraft: true

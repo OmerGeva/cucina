@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { UpdateInfo } from '../api'
 import { api } from '../api'
 
 /** Everything configurable lives here, so there is one place to look. */
@@ -9,6 +10,9 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [version, setVersion] = useState('')
+  const [update, setUpdate] = useState<UpdateInfo | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [installing, setInstalling] = useState(false)
 
   useEffect(() => {
     void api.loginItem().then(setAtLogin)
@@ -24,6 +28,32 @@ export default function Settings() {
     } catch (e) {
       setAtLogin(!next)
       setError(String(e))
+    }
+  }
+
+  // Deliberately manual: nothing reaches the network unless this is pressed.
+  const checkUpdate = async () => {
+    setChecking(true)
+    setError(null)
+    setUpdate(null)
+    try {
+      setUpdate(await api.checkUpdate())
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const applyUpdate = async () => {
+    setInstalling(true)
+    setError(null)
+    try {
+      // Restarts on success, so nothing after this runs.
+      await api.installUpdate()
+    } catch (e) {
+      setError(String(e))
+      setInstalling(false)
     }
   }
 
@@ -62,6 +92,29 @@ export default function Settings() {
           </div>
           {version ? <span className="version">v{version}</span> : null}
         </div>
+
+        <div className="panel-row">
+          <div>
+            <strong className="panel-label">Updates</strong>
+            <p className="prose">
+              {update?.version
+                ? `Version ${update.version} is available.`
+                : update
+                  ? 'Cucina is up to date.'
+                  : 'Checks GitHub for a newer release. Nothing about you is sent.'}
+            </p>
+          </div>
+          {update?.version ? (
+            <button className="btn primary" onClick={applyUpdate} disabled={installing}>
+              {installing ? 'Installing…' : 'Install and restart'}
+            </button>
+          ) : (
+            <button className="btn" onClick={checkUpdate} disabled={checking}>
+              {checking ? 'Checking…' : 'Check for updates'}
+            </button>
+          )}
+        </div>
+        {update?.version && update.notes ? <pre className="code">{update.notes}</pre> : null}
       </section>
 
       <section className="panel">

@@ -236,6 +236,61 @@ fn mcp_snippet(app: AppHandle) -> String {
     .unwrap_or_default()
 }
 
+/// What an update check found. `None` for `version` means we are current.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    version: Option<String>,
+    notes: Option<String>,
+}
+
+/// Ask GitHub whether there is a newer release. Only ever runs when the user
+/// presses the button — the app makes no network requests on its own.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<UpdateInfo, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let found = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(match found {
+        Some(update) => UpdateInfo {
+            version: Some(update.version.clone()),
+            notes: update.body.clone(),
+        },
+        None => UpdateInfo {
+            version: None,
+            notes: None,
+        },
+    })
+}
+
+/// Download and swap the bundle in place. The payload is verified against the
+/// public key compiled into this binary before anything is written, so a
+/// tampered release is refused rather than installed.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Already up to date.")?;
+
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Servers are ours to clean up; restarting must not orphan them.
+    app.state::<AppState>().sup.shutdown();
+    app.restart();
+}
+
 /// The version from tauri.conf.json, so Settings reports what is actually
 /// installed rather than whatever the frontend was compiled against.
 #[tauri::command]
@@ -292,6 +347,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -320,6 +376,8 @@ pub fn run() {
             set_login_item,
             install_cli,
             mcp_snippet,
+            check_update,
+            install_update,
             app_version,
             home_dir,
         ])

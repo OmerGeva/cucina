@@ -40,10 +40,25 @@ publisher and you are asked to clear the quarantine flag by hand. This means a d
 DMG carries no cryptographic assurance that it came from this repository. If that matters to
 you, build from source — see [Installing](README.md#installing).
 
+## The one network request
+
+Cucina contacts the network in exactly one situation: when you press **Check for updates**
+in Settings. It fetches a release manifest from `github.com` and compares the version
+number against the one it is running. Nothing about you, your servers, your commands or
+your machine is transmitted — it is a plain GET for a public file, and GitHub sees only
+what it sees for any anonymous download.
+
+There is no check on launch, no periodic check and no background poll. If you never press
+the button, the app never makes a request.
+
+An update payload is verified against a public key compiled into the app before anything is
+written to disk. A release that is not signed by the project's private key is refused, so
+compromising the download or the release page is not enough to push code to installed
+copies.
+
 ## What it does not do
 
-- No telemetry, analytics, crash reporting or update checks. The app makes no network
-  requests of its own.
+- No telemetry, analytics or crash reporting.
 - No data leaves your machine. Logs are held in a bounded in-memory ring buffer and are not
   written anywhere.
 - Fonts are bundled, so no request goes out to a font CDN at runtime.

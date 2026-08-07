@@ -2,12 +2,15 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Cucina's main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "dialog:default",
     "dialog:allow-open",
-    "autostart:default"
+    "autostart:default",
+    "updater:default"
   ]
 }

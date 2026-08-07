@@ -41,6 +41,12 @@ export interface Worktree {
   isCurrent: boolean
 }
 
+export interface UpdateInfo {
+  /** null when the installed version is already the newest. */
+  version: string | null
+  notes: string | null
+}
+
 export interface Group {
   name: string
   icon: string
@@ -123,6 +129,8 @@ export const api = {
   mcpSnippet: () => invoke<string>('mcp_snippet'),
   homeDir: () => invoke<string>('home_dir'),
   version: () => invoke<string>('app_version'),
+  checkUpdate: () => invoke<UpdateInfo>('check_update'),
+  installUpdate: () => invoke<void>('install_update'),
 }
 
 export const onEvent = (handler: (event: CucinaEvent) => void) =>
