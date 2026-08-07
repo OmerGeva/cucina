@@ -173,11 +173,17 @@ fn find_cli_binary(app: &AppHandle) -> Option<std::path::PathBuf> {
     if let Ok(dir) = app.path().resource_dir() {
         candidates.push(dir.join("cucina-cli"));
     }
-    // Development: the workspace target directory sits next to this crate.
+    // Development only: the workspace target directory sits next to this
+    // crate. CARGO_MANIFEST_DIR is resolved at compile time, so leaving this
+    // in a release build would bake the building machine's home directory
+    // into the shipped binary and hand every user a path that exists only on
+    // that machine.
+    #[cfg(debug_assertions)]
     if let Some(manifest) = option_env!("CARGO_MANIFEST_DIR") {
-        let root = std::path::Path::new(manifest).parent()?;
-        candidates.push(root.join("target/release/cucina-cli"));
-        candidates.push(root.join("target/debug/cucina-cli"));
+        if let Some(root) = std::path::Path::new(manifest).parent() {
+            candidates.push(root.join("target/release/cucina-cli"));
+            candidates.push(root.join("target/debug/cucina-cli"));
+        }
     }
     candidates.into_iter().find(|p| p.is_file())
 }
@@ -211,9 +217,19 @@ fn install_cli(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn mcp_snippet(app: AppHandle) -> String {
-    let command = find_cli_binary(&app)
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "cucina".into());
+    // Prefer the symlink Install writes: it survives the app being replaced
+    // by an update, and it is the path the README documents. Fall back to the
+    // copy inside the bundle so the snippet still works before Install is
+    // pressed — an MCP client does not inherit a shell PATH, so a bare
+    // `cucina` would not resolve.
+    let installed = paths::home().join(".local/bin/cucina");
+    let command = if installed.exists() {
+        installed.display().to_string()
+    } else {
+        find_cli_binary(&app)
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "cucina".into())
+    };
     serde_json::to_string_pretty(&serde_json::json!({
         "mcpServers": { "cucina": { "command": command, "args": ["mcp"] } }
     }))
