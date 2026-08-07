@@ -1,0 +1,64 @@
+# Builds the DMG and attaches it to a GitHub Release when a version tag is
+# pushed:  git tag v0.1.0 && git push origin v0.1.0
+#
+# The build is ad-hoc signed, not notarized — there is no Apple Developer ID
+# for this project — so the release notes tell people to clear the quarantine
+# flag. If a Developer ID is ever added, set APPLE_CERTIFICATE,
+# APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID,
+# APPLE_PASSWORD and APPLE_TEAM_ID as repository secrets; tauri-action picks
+# them up and notarizes automatically, and the note below can go.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - run: npm ci
+
+      # Menu bar marks are generated from geometry rather than committed as
+      # binaries, so they have to be drawn before the bundle is assembled.
+      - run: npm run icons
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Cucina ${{ github.ref_name }}
+          releaseDraft: true
+          prerelease: false
+          releaseBody: |
+            ## Installing
+
+            Apple Silicon, macOS 11 or later.
+
+            Download the `.dmg`, open it, drag Cucina to Applications — then clear the
+            quarantine flag, or macOS will report the app as damaged:
+
+            ```sh
+            xattr -dr com.apple.quarantine /Applications/Cucina.app
+            ```
+
+            This build is ad-hoc signed rather than notarized, because notarizing requires a
+            paid Apple Developer ID. If you would rather not extend that trust, building from
+            source takes a few minutes and needs no such step — see the README.

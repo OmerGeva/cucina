@@ -184,9 +184,8 @@ fn find_cli_binary(app: &AppHandle) -> Option<std::path::PathBuf> {
 
 #[tauri::command]
 fn install_cli(app: AppHandle) -> Result<String, String> {
-    let binary = find_cli_binary(&app).ok_or(
-        "Couldn't find the cucina binary. Run `npm run cli:build` in the project first.",
-    )?;
+    let binary = find_cli_binary(&app)
+        .ok_or("Couldn't find the cucina binary. Run `npm run cli:build` in the project first.")?;
     let bin_dir = paths::home().join(".local/bin");
     std::fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
     let link = bin_dir.join("cucina");
@@ -198,7 +197,10 @@ fn install_cli(app: AppHandle) -> Result<String, String> {
         .split(':')
         .any(|p| std::path::Path::new(p) == bin_dir);
     Ok(if on_path {
-        format!("Installed. Try `cucina` in a new terminal.\n{}", link.display())
+        format!(
+            "Installed. Try `cucina` in a new terminal.\n{}",
+            link.display()
+        )
     } else {
         format!(
             "Installed to {}.\nAdd it to your PATH:\n  echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc",
@@ -250,7 +252,10 @@ fn ensure_ticker(app: &AppHandle, sup: &Arc<Supervisor>) {
             }
             tray::refresh(&handle, &sup);
         }
-        handle.state::<AppState>().ticking.store(false, Ordering::SeqCst);
+        handle
+            .state::<AppState>()
+            .ticking
+            .store(false, Ordering::SeqCst);
     });
 }
 
