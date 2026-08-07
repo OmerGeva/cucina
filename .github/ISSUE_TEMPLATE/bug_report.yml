@@ -1,0 +1,65 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The fields below are the ones that usually
+        decide whether a bug is reproducible — a supervisor problem often turns
+        out to depend on the shell or the version manager involved.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a server pointing at …
+        2. Press start
+        3. …
+    validations: { required: true }
+  - type: input
+    id: command
+    attributes:
+      label: The server's command
+      description: The command Cucina was running, if the problem involves a server.
+      placeholder: npm run dev
+  - type: input
+    id: version
+    attributes:
+      label: Cucina version
+      description: Settings shows it, next to the name.
+      placeholder: v0.1.1
+    validations: { required: true }
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: 15.2, Apple Silicon
+    validations: { required: true }
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it
+      options:
+        - Downloaded the DMG
+        - Built from source
+        - Updated in place from a previous version
+    validations: { required: true }
+  - type: input
+    id: shell
+    attributes:
+      label: Your login shell
+      description: "`echo $SHELL`. Commands run through it, so this matters more than it looks."
+      placeholder: /bin/zsh
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: From the server's screen in Cucina, if there is any.
+      render: shell

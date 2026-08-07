@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest something Cucina should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The situation, rather than the feature — it often has a simpler answer.
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Worth knowing
+      options:
+        - label: I have read the note on battery discipline in CONTRIBUTING.md — Cucina does nothing when idle, so anything that polls needs a good reason.
