@@ -73,29 +73,24 @@ impl Args {
 /// Work out whether a human or an agent is driving. Agents get tagged so the
 /// menu bar can show who started what.
 fn origin(args: &Args) -> Origin {
+    let session = args.get("session").unwrap_or_default();
+    let agent = |client: &str| Origin::agent(client, session);
+
     if let Some(name) = args.get("agent").or_else(|| args.get("client")) {
-        return Origin::Agent {
-            client: name.to_string(),
-        };
+        return agent(name);
     }
     if args.has("agent") {
-        return Origin::Agent {
-            client: "agent".into(),
-        };
+        return agent("agent");
     }
     if let Ok(name) = std::env::var("CUCINA_CLIENT") {
-        return Origin::Agent { client: name };
+        return agent(&name);
     }
     if std::env::var_os("CLAUDECODE").is_some() {
-        return Origin::Agent {
-            client: "Claude Code".into(),
-        };
+        return agent("Claude Code");
     }
     // A non-interactive stdout almost always means something scripted us.
     if !ui::is_tty(1) {
-        return Origin::Agent {
-            client: "agent".into(),
-        };
+        return agent("agent");
     }
     Origin::User
 }

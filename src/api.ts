@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
 export type RunState = 'stopped' | 'starting' | 'running' | 'crashed'
-export type Origin = { kind: 'user' } | { kind: 'agent'; client: string }
+export type Origin =
+  | { kind: 'user' }
+  | { kind: 'agent'; client: string; session?: string }
 export type StreamKind = 'stdout' | 'stderr' | 'system'
 
 export interface Server {
@@ -160,7 +162,33 @@ const SPELLED = [
 /** Small counts read better spelled out in the hero caption. */
 export const spell = (n: number) => (n < SPELLED.length ? SPELLED[n] : String(n))
 
-export function originLabel(origin?: Origin | null): string | null {
+/** The agents we can recognise on sight. Anything else is still credited, it
+    just appears under whatever name it gave us, without a mark. */
+export type AgentBrand = 'claude-code' | 'codex' | 'cursor'
+
+export interface Agent {
+  brand: AgentBrand | null
+  label: string
+  /** What the agent called the conversation it was in. Nothing in MCP carries
+      this, so it is only here when the agent bothered to pass it. */
+  session: string
+}
+
+const BRANDS: [AgentBrand, RegExp, string][] = [
+  ['claude-code', /claude/, 'Claude Code'],
+  ['codex', /codex|openai/, 'Codex'],
+  ['cursor', /cursor/, 'Cursor'],
+]
+
+/** MCP clients name themselves in the initialize handshake, but the exact
+    string drifts between releases — so match loosely, and when nothing matches
+    keep the name rather than dropping the attribution back to "an agent". */
+export function agentOf(origin?: Origin | null): Agent | null {
   if (!origin || origin.kind !== 'agent') return null
-  return origin.client && origin.client !== 'agent' ? origin.client : 'an agent'
+  const raw = origin.client.trim()
+  const session = (origin.session ?? '').trim()
+  const hit = BRANDS.find(([, pattern]) => pattern.test(raw.toLowerCase()))
+  if (hit) return { brand: hit[0], label: hit[2], session }
+  const label = raw && raw.toLowerCase() !== 'agent' ? raw : 'an agent'
+  return { brand: null, label, session }
 }

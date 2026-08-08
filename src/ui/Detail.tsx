@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { CaretLeft } from '@phosphor-icons/react'
 import type { LogLine, ServerView, Worktree } from '../api'
-import { originLabel, shortenPath, uptime } from '../api'
+import { agentOf, shortenPath, uptime } from '../api'
+import AgentMark from './AgentMark'
 import { Dot, stateWord } from './bits'
 import Worktrees from './Worktrees'
 
@@ -41,7 +42,7 @@ export default function Detail({
 }: Props) {
   const { server, status } = view
   const live = status.state === 'running' || status.state === 'starting'
-  const agent = originLabel(status.origin)
+  const agent = agentOf(status.origin)
 
   const scroll = useRef<HTMLDivElement>(null)
   // Follow the tail unless the user has scrolled up to read something.
@@ -85,7 +86,19 @@ export default function Detail({
             <Dot state={status.state} />
             {stateWord(status.state)}
           </span>
-          {agent ? <span className="chip agent">by {agent}</span> : null}
+          {/* Who, and what they were doing — one chip, because the session
+              name means nothing without the agent it belongs to. */}
+          {agent ? (
+            <span className="chip agent" title={`Started by ${agent.label}`}>
+              {agent.brand ? <AgentMark brand={agent.brand} /> : null}
+              {/* One inline run, so the two typefaces share a baseline of
+                  their own accord and the chip centres them as a block. */}
+              <span className="agent-text">
+                by {agent.label}
+                {agent.session ? <span className="session">{agent.session}</span> : null}
+              </span>
+            </span>
+          ) : null}
 
           {status.port ? (
             <button

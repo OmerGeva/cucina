@@ -129,6 +129,13 @@ Seven tools: `cucina_list`, `cucina_start`, `cucina_stop`, `cucina_restart`,
 `cucina_worktrees`, `cucina_switch`, `cucina_logs`. `start` and `restart` can block until
 the port is actually listening, so an agent can start a server and immediately curl it.
 
+Agents identify themselves in the MCP handshake, so a server started by one carries its
+mark — Claude Code, Codex and Cursor are recognised on sight, and anything else is credited
+by whatever name it gave. `start` and `restart` also take an optional `session`: the name
+of the conversation the agent is working in. Nothing in MCP carries that, so it is only
+there when the agent passes it, but when it does, the server's screen tells you which of
+your sessions to go back to.
+
 ![A server and its log](docs/detail.png)
 
 A server's own screen: where it runs, which worktree it is on, and its output.

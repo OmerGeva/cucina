@@ -113,8 +113,13 @@ pub fn table(views: &[ServerView], paint: &Paint) -> String {
             _ => String::new(),
         };
         let by = match &s.origin {
-            Some(Origin::Agent { client }) if !client.is_empty() => format!("  ⌁ {client}"),
-            Some(Origin::Agent { .. }) => "  ⌁ agent".to_string(),
+            Some(Origin::Agent { client, session }) => {
+                let who = if client.is_empty() { "agent" } else { client };
+                match session.is_empty() {
+                    true => format!("  ⌁ {who}"),
+                    false => format!("  ⌁ {who} · {session}"),
+                }
+            }
             _ => String::new(),
         };
 

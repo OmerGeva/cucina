@@ -93,15 +93,39 @@ pub enum Origin {
     Agent {
         #[serde(default)]
         client: String,
+        /// What the agent said it was working on. MCP has no notion of a
+        /// session, so this is only ever as good as what the agent chose to
+        /// pass us — often empty, and never load-bearing.
+        #[serde(default)]
+        session: String,
     },
 }
 
+/// Agents are wordy when you let them, and a session name lands in a header
+/// beside the server's own. Long enough for a ticket title, short enough that
+/// the server stays the loudest thing on the screen.
+const SESSION_MAX: usize = 48;
+
 impl Origin {
+    /// Clamped here rather than at each caller: the MCP tool argument and the
+    /// CLI flag both feed this, and neither can vouch for what it was handed.
+    pub fn agent(client: impl Into<String>, session: &str) -> Origin {
+        let session = session.trim();
+        let session = match session.char_indices().nth(SESSION_MAX) {
+            Some((cut, _)) => format!("{}…", session[..cut].trim_end()),
+            None => session.to_string(),
+        };
+        Origin::Agent {
+            client: client.into(),
+            session,
+        }
+    }
+
     pub fn label(&self) -> String {
         match self {
             Origin::User => "you".into(),
-            Origin::Agent { client } if client.is_empty() => "an agent".into(),
-            Origin::Agent { client } => client.clone(),
+            Origin::Agent { client, .. } if client.is_empty() => "an agent".into(),
+            Origin::Agent { client, .. } => client.clone(),
         }
     }
 }
@@ -170,7 +194,7 @@ pub enum Event {
 
 #[cfg(test)]
 mod tests {
-    use super::{slugify, State};
+    use super::{slugify, Origin, State, SESSION_MAX};
 
     #[test]
     fn slugs_are_stable_and_cli_friendly() {
@@ -192,6 +216,30 @@ mod tests {
         assert_eq!(slugify(""), "server");
         assert_eq!(slugify("!!!"), "server");
         assert_eq!(slugify("日本語"), "server");
+    }
+
+    #[test]
+    fn a_session_name_is_trimmed_and_clamped() {
+        let session = |s: &str| match Origin::agent("claude-code", s) {
+            Origin::Agent { session, .. } => session,
+            Origin::User => unreachable!(),
+        };
+
+        assert_eq!(
+            session("  Chemical patents analysis tool  "),
+            "Chemical patents analysis tool"
+        );
+        assert_eq!(session(""), "");
+
+        // Clamped on a char boundary, with the trailing space eaten so the
+        // ellipsis sits against a word rather than floating off one.
+        let long = session(&"a".repeat(SESSION_MAX + 10));
+        assert_eq!(long.chars().count(), SESSION_MAX + 1);
+        assert!(long.ends_with('…'));
+
+        // Multi-byte input must not panic or split a character in half.
+        let jp = session(&"日本語".repeat(40));
+        assert_eq!(jp.chars().count(), SESSION_MAX + 1);
     }
 
     #[test]
