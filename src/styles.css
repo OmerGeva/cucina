@@ -85,6 +85,17 @@ button {
   padding: 0;
 }
 
+/* The arrow above is the app's resting state — this is a desktop window, not
+   a document, so text and chrome do not invite a click. Anything that does
+   has to say so, and saying it here means a new control cannot forget to.
+   A disabled button keeps the arrow: it is telling the truth. */
+button:not(:disabled),
+[role='button'],
+label.toggle,
+label.toggle input {
+  cursor: pointer;
+}
+
 ::-webkit-scrollbar {
   width: 11px;
 }
@@ -464,8 +475,11 @@ button {
   background: var(--card-idle);
 }
 
+/* Mid-drag the card is being carried, not offered — the ghost under the
+   cursor is the thing being pointed at. */
 .card.lifting {
   opacity: 0.32;
+  cursor: grabbing;
 }
 
 /* The per-server signature. Pitch varies by server id, which is the variety
