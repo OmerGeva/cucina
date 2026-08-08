@@ -1,8 +1,9 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import { Play, Stop } from '@phosphor-icons/react'
 import type { ServerView } from '../api'
-import { originLabel, uptime } from '../api'
+import { agentOf, uptime } from '../api'
 import { pitchFor } from '../rings'
+import AgentMark from './AgentMark'
 
 interface Props {
   view: ServerView
@@ -35,7 +36,7 @@ export default function ServerCard({
 }: Props) {
   const { server, status } = view
   const live = status.state === 'running' || status.state === 'starting'
-  const agent = originLabel(status.origin)
+  const agent = agentOf(status.origin)
 
   // The command lives in the detail view. Here the useful facts are the name,
   // the branch, whether it's up, and the port — so state carries the
@@ -47,7 +48,19 @@ export default function ServerCard({
     if (status.state === 'starting') return 'starting…'
     if (live && status.startedAt) {
       const up = `up ${uptime(status.startedAt, now)}`
-      return agent ? `${up} · ${agent}` : up
+      if (!agent) return up
+      // A card is narrow and the name is the one thing on it that can't be
+      // abbreviated, so the mark carries the attribution alone here and the
+      // detail screen spells it out. An agent we don't have a mark for still
+      // gets its name — better a truncated word than no credit at all.
+      return (
+        <>
+          {up} ·{' '}
+          <span className="card-agent" title={`Started by ${agent.label}`}>
+            {agent.brand ? <AgentMark brand={agent.brand} /> : agent.label}
+          </span>
+        </>
+      )
     }
     return 'idle'
   }

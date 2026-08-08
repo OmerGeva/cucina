@@ -58,7 +58,37 @@ const VIEWS: ServerView[] = [
       pid: 4712,
       port: 8000,
       startedAt: since(23),
-      origin: { kind: 'agent', client: 'Claude Code' },
+      // The raw strings clients send in the MCP handshake, not display names —
+      // the point of the harness is to prove the matching works.
+      origin: {
+        kind: 'agent',
+        client: 'claude-code',
+        session: 'Chemical patents analysis tool',
+      },
+      restarts: 0,
+    },
+  },
+  {
+    server: server('search', 'Search', `${HOME}/code/acme/search`, 'cargo watch -x run', 'acme'),
+    status: {
+      id: 'search',
+      state: 'running',
+      pid: 4714,
+      port: 7700,
+      startedAt: since(8),
+      origin: { kind: 'agent', client: 'codex', session: 'Redline export without color' },
+      restarts: 0,
+    },
+  },
+  {
+    server: server('worker', 'Worker', `${HOME}/code/acme/worker`, 'npm run worker', 'acme'),
+    status: {
+      id: 'worker',
+      state: 'running',
+      pid: 4715,
+      port: 9200,
+      startedAt: since(2),
+      origin: { kind: 'agent', client: 'cursor-vscode' },
       restarts: 0,
     },
   },
@@ -92,6 +122,23 @@ const LOGS: Record<string, LogLine[]> = {
     seq: i,
     ts: Date.now(),
     stream: i === 0 ? 'system' : 'stdout',
+    text,
+  })),
+  // The agent-started server needs output of its own: it is the one that
+  // shows the attribution chip, so it is the one worth screenshotting.
+  'data-service': [
+    'poetry run uvicorn app:api --reload — in ~/code/acme/data-service',
+    'INFO:     Will watch for changes in these directories: ["/code/acme/data-service"]',
+    'INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)',
+    'INFO:     Started reloader process [88214] using WatchFiles',
+    'INFO:     Application startup complete.',
+    'INFO:     127.0.0.1:53318 - "GET /v1/documents?limit=25 HTTP/1.1" 200 OK',
+    'INFO:     127.0.0.1:53319 - "POST /v1/embeddings HTTP/1.1" 201 Created',
+    'INFO:     127.0.0.1:53320 - "GET /v1/documents/4c1a HTTP/1.1" 200 OK',
+  ].map((text, i) => ({
+    seq: i,
+    ts: Date.now(),
+    stream: i === 0 ? 'system' : ('stdout' as const),
     text,
   })),
   'cms': [

@@ -8,9 +8,14 @@ use cucina_core::model::Origin;
 use cucina_core::proto::Request;
 use serde_json::{json, Value};
 use std::io::{BufRead, Write};
+use std::sync::OnceLock;
 
 const LATEST_PROTOCOL: &str = "2025-06-18";
 const WAIT_MS: u64 = 45_000;
+
+/// Whoever the client said it was in the handshake. One server process serves
+/// exactly one client for its whole life, so the first answer is the only one.
+static CLIENT: OnceLock<String> = OnceLock::new();
 
 pub fn run() {
     let stdin = std::io::stdin();
@@ -51,6 +56,10 @@ pub fn run() {
 fn handle(method: &str, params: &Value) -> Result<Value, (i32, String)> {
     match method {
         "initialize" => {
+            if let Some(name) = client_from(params) {
+                let _ = CLIENT.set(name);
+            }
+
             // Echo the client's protocol version when they name one.
             let version = params
                 .get("protocolVersion")
@@ -91,6 +100,13 @@ fn tools() -> Value {
         "type": "string",
         "description": "A server id, or a group name to act on every server in that project at once. Both are shown by cucina_list."
     });
+    // Nothing in MCP tells a server which conversation it is talking to, so
+    // the only way to show the user which of their sessions started a server
+    // is to ask the agent outright.
+    let session_arg = json!({
+        "type": "string",
+        "description": "What this session is called. If your conversation or session already has a title, pass that verbatim. Otherwise a few words naming what you are working on — the task, ticket or feature. Shown to the user beside your name so they can tell which of your sessions started this server. Always pass it."
+    });
     json!([
         {
             "name": "cucina_list",
@@ -104,6 +120,7 @@ fn tools() -> Value {
                 "type": "object",
                 "properties": {
                     "id": id_arg,
+                    "session": session_arg,
                     "wait": {
                         "type": "boolean",
                         "description": "Block until the server is listening (up to 45s). Defaults to true."
@@ -130,6 +147,7 @@ fn tools() -> Value {
                 "type": "object",
                 "properties": {
                     "id": id_arg,
+                    "session": session_arg,
                     "wait": { "type": "boolean", "description": "Block until listening. Defaults to true." }
                 },
                 "required": ["id"],
@@ -186,8 +204,36 @@ fn tools() -> Value {
     ])
 }
 
+/// The handshake is the one place a client names itself, and every client
+/// names itself to every server it opens — which is what makes the attribution
+/// on a card cost the user no setup at all.
+fn client_from(params: &Value) -> Option<String> {
+    params
+        .get("clientInfo")
+        .and_then(|c| c.get("name"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+}
+
+/// An explicit env var wins: it lets a wrapper call itself something the
+/// handshake has no way to say. Otherwise take the client at its word, and
+/// only fall back to the anonymous label if it never introduced itself.
 fn client_name() -> String {
-    std::env::var("CUCINA_CLIENT").unwrap_or_else(|_| "an agent".to_string())
+    if let Ok(name) = std::env::var("CUCINA_CLIENT") {
+        return name;
+    }
+    CLIENT
+        .get()
+        .cloned()
+        .unwrap_or_else(|| "an agent".to_string())
+}
+
+fn arg_session(args: &Value) -> &str {
+    args.get("session")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
 }
 
 fn arg_id(args: &Value) -> Result<String, String> {
@@ -233,9 +279,7 @@ fn wait_ms(args: &Value) -> Option<u64> {
 
 fn call(name: &str, args: &Value) -> Result<String, String> {
     let mut c = Client::connect_or_launch()?;
-    let origin = Origin::Agent {
-        client: client_name(),
-    };
+    let origin = Origin::agent(client_name(), arg_session(args));
 
     let pretty = |v: &Value| serde_json::to_string_pretty(v).unwrap_or_else(|_| v.to_string());
 
@@ -353,5 +397,55 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 .join("\n"))
         }
         other => Err(format!("Unknown tool: {other}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The whole attribution rests on this one handshake field, and a client
+    /// that stopped sending it would fail silently back to "an agent".
+    #[test]
+    fn a_client_is_read_from_the_handshake() {
+        assert_eq!(
+            client_from(&json!({ "clientInfo": { "name": "claude-code", "version": "2.0.1" } })),
+            Some("claude-code".to_string())
+        );
+        assert_eq!(
+            client_from(&json!({ "clientInfo": { "name": " codex " } })),
+            Some("codex".to_string())
+        );
+    }
+
+    /// A client that sends no clientInfo, or a blank name, must leave the
+    /// anonymous label in place rather than blanking the attribution out.
+    #[test]
+    fn a_nameless_client_is_left_anonymous() {
+        assert_eq!(client_from(&json!({})), None);
+        assert_eq!(client_from(&json!({ "clientInfo": {} })), None);
+        assert_eq!(
+            client_from(&json!({ "clientInfo": { "name": "  " } })),
+            None
+        );
+        assert_eq!(client_from(&json!({ "clientInfo": { "name": 7 } })), None);
+    }
+
+    /// One process serves one client for its whole life, so the first name we
+    /// hear is the only one — a later handshake cannot relabel running servers.
+    #[test]
+    fn the_first_handshake_wins() {
+        handle(
+            "initialize",
+            &json!({ "clientInfo": { "name": "claude-code" } }),
+        )
+        .expect("initialize");
+        handle(
+            "initialize",
+            &json!({ "clientInfo": { "name": "cursor-vscode" } }),
+        )
+        .expect("initialize");
+
+        assert_eq!(CLIENT.get().map(String::as_str), Some("claude-code"));
     }
 }

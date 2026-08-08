@@ -40,7 +40,9 @@ fn label(view: &ServerView) -> String {
                 let ms = cucina_core::model::now_ms().saturating_sub(started);
                 parts.push(uptime(ms));
             }
-            if let Some(Origin::Agent { client }) = &s.origin {
+            // The session name stays on the detail screen — a menu item is
+            // one line and already carrying port, uptime and client.
+            if let Some(Origin::Agent { client, .. }) = &s.origin {
                 let who = if client.is_empty() { "agent" } else { client };
                 parts.push(format!("⌁ {who}"));
             }

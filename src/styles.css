@@ -624,6 +624,22 @@ label.toggle input {
   text-overflow: ellipsis;
 }
 
+/* Sits in the caption's run of text, so it aligns to the baseline rather than
+   to a flex row of its own. */
+.card-agent {
+  white-space: nowrap;
+}
+
+/* Carrying the attribution on its own, so a touch larger than the caption it
+   sits in. Centred on the text rather than sat on its baseline: these marks
+   have no baseline of their own, and a 1em box hung off one rides high. */
+.card-agent .mark {
+  font-size: 13px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
 .card:not(.live) .card-meta {
   color: rgba(26, 24, 21, 0.38);
 }
@@ -767,6 +783,50 @@ label.toggle input {
   border: 1px solid rgba(26, 24, 21, 0.24);
 }
 
+.chip.agent {
+  min-width: 0;
+}
+
+/* Two typefaces at two sizes share this chip. Keeping them in one inline run
+   lets them find their own common baseline, and leaves the chip a single
+   block to centre — aligning them as separate flex items lines them up
+   against the box instead of against each other, and neither one wins. */
+.chip.agent .agent-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The mark runs a little larger than its label — a 9.5px glyph is a smudge,
+   and the letter-spacing on the chip leaves it room. */
+.chip.agent .mark {
+  flex: none;
+  margin-right: 7px;
+  font-size: 12px;
+}
+
+/* Whatever the agent called its conversation. Set as a machine string rather
+   than in the chip's uppercase, because it is one — a title we are quoting,
+   not a label we are writing. Shouting it would also make it the loudest
+   thing in a header the server's own name is supposed to own. */
+.chip.agent .session {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(26, 24, 21, 0.2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+  /* Held to its own em box so its descenders cannot stretch the line box
+     downward. Left alone, the taller mono run pushes the chip's floor down
+     and the uppercase label — which has no descenders to fill that space —
+     ends up riding visibly high inside the border. */
+  line-height: 1;
+}
+
 /* The ghost that follows the cursor while dragging a card. */
 .ghost {
   position: fixed;
@@ -871,6 +931,7 @@ label.toggle input {
 .detail-meta .sep {
   opacity: 0.4;
 }
+
 
 .path-btn {
   font: inherit;
