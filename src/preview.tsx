@@ -6,7 +6,7 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { LogLine, ServerView } from './api'
+import type { LogLine, Run, ServerView, Task } from './api'
 import './fonts.css'
 import './styles.css'
 
@@ -149,6 +149,98 @@ const LOGS: Record<string, LogLine[]> = {
   ],
 }
 
+const task = (command: string, lastExit: number | null, ranMinsAgo?: number): Task => ({
+  id: command.replace(/[^a-z0-9]+/gi, '-').toLowerCase(),
+  command,
+  lastExit,
+  lastRunAt: ranMinsAgo === undefined ? null : since(ranMinsAgo),
+})
+
+/* Twelve entries with three long ones — the list scrolls and ellipsises, which
+   is the state worth looking at. `docs` is left with none, so the first-open
+   case is one click away at ?at=server:docs. */
+const TASKS: Record<string, Task[]> = {
+  'data-service': [
+    task('bin/rails db:migrate', 0, 4),
+    task('bin/rails db:seed', 0, 40),
+    task('npx prisma migrate deploy --schema=./prisma/schema.prisma', 1, 55),
+    task('bin/rails console', null, 61),
+    task('bundle exec rspec spec/models/dataset_spec.rb', 0, 90),
+    task('npx tsc --noEmit --project ./tsconfig.build.json', 2, 120),
+    task('tail -f log/development.log', null, 200),
+    task('bin/rails db:rollback STEP=1', 0, 240),
+    task('make lint', 0, 300),
+    task('python manage.py createsuperuser', 0, 360),
+    task('bundle exec rake assets:precompile', 0, 420),
+    task('alembic upgrade head', 0, 480),
+  ],
+  'api': [task('make migrate', 0, 12), task('make seed', 1, 30)],
+  'search': [],
+}
+
+/* Whatever `?run=` asks for, so each output-box state can be opened directly:
+   ?at=server:data-service&run=running | done | failed | quiet */
+const RUNS: Record<string, Run> = {
+  running: {
+    runId: 'run-1',
+    serverId: 'data-service',
+    taskId: 'bin-rails-db-migrate',
+    command: 'bin/rails db:migrate',
+    startedAt: Date.now() - 4_000,
+    lastOutputAt: Date.now() - 500,
+  },
+  done: {
+    runId: 'run-2',
+    serverId: 'data-service',
+    taskId: 'bin-rails-db-migrate',
+    command: 'bin/rails db:migrate',
+    startedAt: Date.now() - 8_000,
+    endedAt: Date.now() - 4_600,
+    exitCode: 0,
+    lastOutputAt: Date.now() - 4_600,
+  },
+  failed: {
+    runId: 'run-3',
+    serverId: 'data-service',
+    taskId: 'npx-prisma-migrate-deploy',
+    command: 'npx prisma migrate deploy --schema=./prisma/schema.prisma',
+    startedAt: Date.now() - 9_000,
+    endedAt: Date.now() - 7_800,
+    exitCode: 1,
+    lastOutputAt: Date.now() - 7_800,
+  },
+  // Four minutes of silence, still going — the case a special "stuck" state
+  // would have got wrong.
+  quiet: {
+    runId: 'run-4',
+    serverId: 'data-service',
+    taskId: 'bin-rails-console',
+    command: 'bin/rails console',
+    startedAt: Date.now() - 252_000,
+    lastOutputAt: Date.now() - 248_000,
+  },
+}
+
+const RUN_OUTPUT: Record<string, string[]> = {
+  running: [
+    '$ bin/rails db:migrate',
+    '== 20260721142233 AddIndexToDatasets: migrating ==========',
+    '-- add_index(:datasets, [:workspace_id, :created_at])',
+    '   -> 0.0431s',
+  ],
+  done: [
+    '$ bin/rails db:migrate',
+    '== 20260721142310 BackfillDatasetCounts: migrated (2.9102s) ==',
+    'exited 0 after 3.4s',
+  ],
+  failed: [
+    '$ npx prisma migrate deploy --schema=./prisma/schema.prisma',
+    'Error: P3009 migrate found failed migrations in the target database',
+    'exited 1 after 1.2s',
+  ],
+  quiet: ['$ bin/rails console', 'Loading development environment (Rails 7.1.3)', 'irb(main):001:0>'],
+}
+
 const RESPONSES: Record<string, unknown> = {
   list_servers: VIEWS,
   list_groups: [{ name: 'acme', icon: '' }],
@@ -175,6 +267,27 @@ const RESPONSES: Record<string, unknown> = {
   ),
 }
 
+const wanted = new URLSearchParams(location.search).get('run') ?? ''
+const staged = RUNS[wanted]
+
+// A run's output belongs to the server's own stream, so the harness appends it
+// the same way the supervisor does — that is the whole point of the merge.
+if (staged) {
+  const log = LOGS[staged.serverId] ?? []
+  LOGS[staged.serverId] = log.concat(
+    (RUN_OUTPUT[wanted] ?? []).map((text, i) => ({
+      seq: log.length + i,
+      ts: staged.lastOutputAt,
+      stream: text.startsWith('$ ') || text.startsWith('exited')
+        ? ('system' as const)
+        : text.startsWith('Error:')
+          ? ('stderr' as const)
+          : ('stdout' as const),
+      text,
+    })),
+  )
+}
+
 ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
   transformCallback: (callback: unknown) => {
     const id = Math.floor(Math.random() * 1e9)
@@ -183,6 +296,25 @@ const RESPONSES: Record<string, unknown> = {
   },
   invoke: async (command: string, args: Record<string, unknown> = {}) => {
     if (command === 'read_logs') return LOGS[args.id as string] ?? []
+    if (command === 'list_tasks') return TASKS[args.id as string] ?? []
+    if (command === 'suggest_tasks') {
+      // Mirrors `manifest::suggest`: whatever the project offers, minus what
+      // the user already keeps. Offering a command twice is the bug this
+      // filter exists to prevent, so the harness has to have it too.
+      const kept = new Set((TASKS[args.id as string] ?? []).map((t) => t.command))
+      const commands = [
+        'bin/rails db:migrate',
+        'bin/rails db:seed',
+        'bin/rails console',
+        'bin/rails db:rollback STEP=1',
+        'bundle exec rspec',
+        'bundle exec rubocop --autocorrect-all --config ./.rubocop.yml',
+      ].filter((c) => !kept.has(c))
+      return { source: commands.length ? 'Gemfile' : '', commands }
+    }
+    if (command === 'read_run') {
+      return staged && staged.serverId === args.id ? staged : null
+    }
     if (command === 'save_server') {
       const next = args.server as ServerView['server']
       const i = VIEWS.findIndex((v) => v.server.id === next.id)

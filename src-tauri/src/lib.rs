@@ -1,6 +1,7 @@
 mod tray;
 
-use cucina_core::model::{Event, Group, LogLine, Origin, Server};
+use cucina_core::manifest::Suggestions;
+use cucina_core::model::{Event, Group, LogLine, Origin, Run, Server, Task};
 use cucina_core::proto::ServerView;
 use cucina_core::{ipc, paths, Supervisor};
 
@@ -101,6 +102,57 @@ fn read_logs(state: State<'_, AppState>, id: String, tail: Option<usize>) -> Vec
 #[tauri::command]
 fn clear_logs(state: State<'_, AppState>, id: String) {
     state.sup.clear_logs(&id);
+}
+
+// ---- tasks ----------------------------------------------------------------
+
+#[tauri::command]
+fn list_tasks(state: State<'_, AppState>, id: String) -> Vec<Task> {
+    state.sup.tasks(&id)
+}
+
+#[tauri::command]
+fn run_task(state: State<'_, AppState>, id: String, task_id: String) -> Result<Run, String> {
+    state.sup.run_task(&id, &task_id, Origin::User)
+}
+
+#[tauri::command]
+fn run_command(state: State<'_, AppState>, id: String, command: String) -> Result<Run, String> {
+    state.sup.run_command(&id, &command, Origin::User)
+}
+
+#[tauri::command]
+fn stop_run(state: State<'_, AppState>, run_id: String) -> Result<(), String> {
+    state.sup.stop_run(&run_id)
+}
+
+#[tauri::command]
+fn delete_task(state: State<'_, AppState>, id: String, task_id: String) -> Result<(), String> {
+    state.sup.remove_task(&id, &task_id)
+}
+
+/// The current or most recent run. No output comes back with it: a run writes
+/// into the server's own log, so the window the user is already reading has it.
+#[tauri::command]
+fn read_run(state: State<'_, AppState>, id: String) -> Option<Run> {
+    state.sup.run_of(&id)
+}
+
+#[tauri::command]
+fn suggest_tasks(state: State<'_, AppState>, id: String) -> Suggestions {
+    let Some(server) = state.sup.get(&id) else {
+        return Suggestions {
+            source: String::new(),
+            commands: Vec::new(),
+        };
+    };
+    let kept: Vec<String> = state
+        .sup
+        .tasks(&id)
+        .into_iter()
+        .map(|t| t.command)
+        .collect();
+    cucina_core::manifest::suggest(&paths::expand_tilde(&server.dir), &server.command, &kept)
 }
 
 #[tauri::command]
@@ -369,6 +421,13 @@ pub fn run() {
             switch_worktree,
             read_logs,
             clear_logs,
+            list_tasks,
+            run_task,
+            run_command,
+            stop_run,
+            delete_task,
+            read_run,
+            suggest_tasks,
             open_url,
             reveal_in_finder,
             pick_directory,
@@ -420,6 +479,11 @@ pub fn run() {
                         if visible {
                             let _ = event_handle.emit(EVENT, &ev);
                         }
+                    }
+                    // A task run is not a server, so it changes nothing the
+                    // menu bar shows — forward it and skip the tray redraw.
+                    Event::Run(_) | Event::Tasks { .. } => {
+                        let _ = event_handle.emit(EVENT, &ev);
                     }
                     _ => {
                         let _ = event_handle.emit(EVENT, &ev);

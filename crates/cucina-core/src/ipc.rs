@@ -1,6 +1,6 @@
 use crate::model::State;
 use crate::paths;
-use crate::proto::{Request, Response, ServerView};
+use crate::proto::{Request, Response, RunView, ServerView};
 use crate::supervisor::Supervisor;
 
 use std::io::{BufRead, BufReader, Write};
@@ -164,6 +164,65 @@ fn dispatch(sup: &Arc<Supervisor>, req: Request) -> Response {
             Ok(()) => finish(sup, &id, None),
             Err(e) => Response::err(e),
         },
+
+        Request::Tasks { id } => json(sup.tasks(&id)),
+
+        Request::AddTask { id, command } => match sup.add_task(&id, &command) {
+            Ok(task) => json(task),
+            Err(e) => Response::err(e),
+        },
+
+        Request::RemoveTask { id, task_id } => match sup.remove_task(&id, &task_id) {
+            Ok(()) => Response::empty(),
+            Err(e) => Response::err(e),
+        },
+
+        Request::RunTask {
+            id,
+            task_id,
+            origin,
+        } => match sup.run_task(&id, &task_id, origin) {
+            Ok(run) => json(run),
+            Err(e) => Response::err(e),
+        },
+
+        Request::RunCommand {
+            id,
+            command,
+            origin,
+        } => match sup.run_command(&id, &command, origin) {
+            Ok(run) => json(run),
+            Err(e) => Response::err(e),
+        },
+
+        Request::Run { id, tail } => json(RunView {
+            run: sup.run_of(&id),
+            lines: sup.run_tail(&id, tail.unwrap_or(500)),
+        }),
+
+        Request::StopRun { run_id } => match sup.stop_run(&run_id) {
+            Ok(()) => Response::empty(),
+            Err(e) => Response::err(e),
+        },
+
+        Request::SuggestTasks { id } => match sup.get(&id) {
+            Some(server) => {
+                let kept: Vec<String> = sup.tasks(&id).into_iter().map(|t| t.command).collect();
+                json(crate::manifest::suggest(
+                    &paths::expand_tilde(&server.dir),
+                    &server.command,
+                    &kept,
+                ))
+            }
+            None => Response::err(format!("No server called {id}.")),
+        },
+    }
+}
+
+fn json<T: serde::Serialize>(value: T) -> Response {
+    match serde_json::to_value(value) {
+        Ok(v) => Response::ok(v),
+        Err(e) => Response::err(e.to_string()),
     }
 }
 

@@ -61,11 +61,44 @@ export interface LogLine {
   text: string
 }
 
+/** A command kept on a server — a migration, a seed, a test run. Distinct from
+    the server's own `command`, which is the one that starts it. */
+export interface Task {
+  id: string
+  command: string
+  /** How the last run ended: 0 succeeded, n failed, and null alongside a
+      `lastRunAt` means a signal ended it — what pressing Stop looks like. */
+  lastExit?: number | null
+  /** Null until it has run once. */
+  lastRunAt?: number | null
+}
+
+export interface Run {
+  runId: string
+  serverId: string
+  taskId: string
+  command: string
+  startedAt: number
+  /** Null while it is still going. The only "is it live" test there is. */
+  endedAt?: number | null
+  exitCode?: number | null
+  origin?: Origin | null
+  lastOutputAt: number
+}
+
+export interface Suggestions {
+  /** The manifest the commands were read from, for the menu header. */
+  source: string
+  commands: string[]
+}
+
 export type CucinaEvent =
   | ({ type: 'status' } & Status)
   | { type: 'log'; id: string; lines: LogLine[] }
   | { type: 'serversChanged' }
   | { type: 'show' }
+  | ({ type: 'run' } & Run)
+  | { type: 'tasks'; id: string; tasks: Task[] }
 
 export const blankServer = (): Server => ({
   id: '',
@@ -122,6 +155,13 @@ export const api = {
     invoke<void>('switch_worktree', { id, path }),
   logs: (id: string, tail = 500) => invoke<LogLine[]>('read_logs', { id, tail }),
   clearLogs: (id: string) => invoke<void>('clear_logs', { id }),
+  tasks: (id: string) => invoke<Task[]>('list_tasks', { id }),
+  runTask: (id: string, taskId: string) => invoke<Run>('run_task', { id, taskId }),
+  runCommand: (id: string, command: string) => invoke<Run>('run_command', { id, command }),
+  stopRun: (runId: string) => invoke<void>('stop_run', { runId }),
+  deleteTask: (id: string, taskId: string) => invoke<void>('delete_task', { id, taskId }),
+  readRun: (id: string) => invoke<Run | null>('read_run', { id }),
+  suggestTasks: (id: string) => invoke<Suggestions>('suggest_tasks', { id }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),
   reveal: (path: string) => invoke<void>('reveal_in_finder', { path }),
   pickDirectory: () => invoke<string | null>('pick_directory'),
@@ -152,6 +192,38 @@ export function uptime(since: number, now: number): string {
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   return m ? `${h}h ${m}m` : `${h}h`
+}
+
+/** Deliberately not a type predicate: a finished run is still a `Run`, so
+    narrowing on this would tell the compiler the wrong thing. */
+export const isRunning = (run?: Run | null): boolean => Boolean(run && run.endedAt == null)
+
+/** The elapsed clock on a live run: `0:04`, `12:31`, `1:04:02`. */
+export function elapsed(since: number, now: number): string {
+  const secs = Math.max(0, Math.floor((now - since) / 1000))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const m = Math.floor(secs / 60)
+  if (m < 60) return `${m}:${pad(secs % 60)}`
+  return `${Math.floor(m / 60)}:${pad(m % 60)}:${pad(secs % 60)}`
+}
+
+export interface Outcome {
+  text: string
+  /** Vermilion. A failure, or a run in progress. */
+  loud: boolean
+  /** Draws the filled square, which in this app only ever means running. */
+  running: boolean
+}
+
+/** What a task's last run came to. Null before it has ever run, which reads as
+    "no outcome to report" rather than as a success. */
+export function outcomeOf(task: Task, running: boolean): Outcome | null {
+  if (running) return { text: 'running', loud: true, running: true }
+  if (task.lastRunAt == null) return null
+  // A signal leaves no exit code, and the only thing that sends one here is
+  // the user pressing Stop — so it is reported as their doing, not a failure.
+  if (task.lastExit == null) return { text: 'stopped', loud: false, running: false }
+  return { text: `exit ${task.lastExit}`, loud: task.lastExit !== 0, running: false }
 }
 
 const SPELLED = [

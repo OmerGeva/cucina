@@ -92,6 +92,22 @@ window leaves your servers running; quitting Cucina stops them.
 
 Per server you can also set environment variables, restart-on-crash, and start-when-Cucina-opens.
 
+## Tasks
+
+A server is more than the command that starts it. **Tasks** are the other commands you run
+in that directory — `bin/rails db:migrate`, `npm run seed`, `alembic upgrade head`. Press
+**Tasks** on a server's screen, type one, and it runs there: same directory, same
+environment, same worktree. It stays on the list afterwards with how it ended, so the next
+time is one click.
+
+Cucina reads your `package.json`, `Gemfile`, `Makefile` or equivalent and offers what it
+finds. Nothing is added until you run it — an imported list of twelve npm scripts is noise,
+and the set you actually use is two or three.
+
+Output goes into the server's own log, in the order it happened, so you can see a migration
+and the requests it broke together. One task runs at a time per server: most of these touch
+one database in one directory, and two at once is a corruption rather than an inconvenience.
+
 ## The command line
 
 Settings → Agents → **Install** puts `cucina` in `~/.local/bin`.
@@ -125,9 +141,15 @@ Settings → Agents → **Copy config** gives you the snippet. For Claude Code:
 }
 ```
 
-Seven tools: `cucina_list`, `cucina_start`, `cucina_stop`, `cucina_restart`,
-`cucina_worktrees`, `cucina_switch`, `cucina_logs`. `start` and `restart` can block until
-the port is actually listening, so an agent can start a server and immediately curl it.
+Seven tools for the server itself: `cucina_list`, `cucina_start`, `cucina_stop`,
+`cucina_restart`, `cucina_worktrees`, `cucina_switch`, `cucina_logs`. `start` and `restart`
+can block until the port is actually listening, so an agent can start a server and
+immediately curl it.
+
+Seven more for its tasks: `cucina_tasks`, `cucina_run_task`, `cucina_run_command`,
+`cucina_run`, `cucina_stop_run`, `cucina_delete_task`, `cucina_suggest_tasks`.
+`cucina_run_command` is the one agents reach for — it runs a command and keeps it, so
+anything an agent ran is in your list afterwards rather than in a history you never see.
 
 Agents identify themselves in the MCP handshake, so a server started by one carries its
 mark — Claude Code, Codex and Cursor are recognised on sight, and anything else is credited

@@ -1029,6 +1029,293 @@ label.toggle input {
   font-size: 12.5px;
 }
 
+/* ---- tasks --------------------------------------------------------------- */
+
+/* Saved commands: the migration, the seed, the test run. The server's own
+   start command is never one of these — that is the play button on the card,
+   and offering it here would invite a second copy of the server.
+
+   The menu follows .select-menu, which is already this app's dropdown: same
+   4px gap, same hairline, same rise. A second treatment for the same gesture
+   would be one too many. */
+.tasks-anchor {
+  position: relative;
+  display: flex;
+}
+
+.tasks {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 352px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 12px 30px rgba(26, 24, 21, 0.18);
+  transform-origin: top left;
+  animation: pop 130ms var(--ease-out);
+}
+
+/* About seven rows. Twelve entries scroll; nothing groups them. */
+.tasks-list {
+  max-height: 214px;
+  overflow-y: auto;
+}
+
+/* Rows never wrap. A list read by shape stops being scannable the moment its
+   rows have different heights, so a long command ellipsises and shows in full
+   on hover instead. */
+.task {
+  display: grid;
+  grid-template-columns: 1fr 58px 18px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px;
+  border-bottom: 1px solid rgba(26, 24, 21, 0.09);
+  transition: background 100ms var(--ease-out);
+}
+
+.task:last-child {
+  border-bottom: 0;
+}
+
+.task:hover {
+  background: var(--tint);
+}
+
+.task-command {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-outcome {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--ink-3);
+}
+
+/* Success is silent: no colour, no mark, just the fact. */
+.task-outcome.loud {
+  color: var(--vermilion);
+}
+
+/* The rule the whole app follows — a vermilion square means running. So it can
+   never also mean failed, which is why a failure is type alone. */
+.task-square {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: var(--vermilion);
+}
+
+.task-drop {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity 100ms var(--ease-out),
+    color 100ms var(--ease-out);
+}
+
+.task:hover .task-drop {
+  opacity: 1;
+}
+
+.task-drop:hover {
+  color: var(--vermilion);
+}
+
+.task-play {
+  font-size: 10px;
+  color: var(--ink-4);
+  text-align: right;
+  grid-column: 2 / span 2;
+}
+
+/* Offered, never added. Tapping one runs it, and running it is what keeps it. */
+.task.offered .task-command {
+  color: var(--ink-2);
+}
+
+.tasks-from,
+.tasks-more {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 11px;
+  background: var(--tint);
+  border-bottom: 1px solid rgba(26, 24, 21, 0.09);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tasks-more {
+  border-top: 1px solid rgba(26, 24, 21, 0.09);
+  border-bottom: 0;
+  transition: color 130ms var(--ease-out);
+}
+
+.tasks-more:hover {
+  color: var(--ink);
+}
+
+.tasks-hint {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-4);
+}
+
+.tasks-empty {
+  margin: 0;
+  padding: 22px 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.tasks-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  background: var(--tint);
+  border-top: 1px solid rgba(26, 24, 21, 0.09);
+}
+
+.tasks-field .prompt {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-4);
+}
+
+.tasks-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line-control);
+  transition:
+    border-color 130ms var(--ease-out),
+    box-shadow 130ms var(--ease-out);
+}
+
+.tasks-field input:focus {
+  outline: none;
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px rgba(232, 64, 42, 0.16);
+}
+
+.btn .caret {
+  margin-left: 7px;
+  font-size: 9px;
+  letter-spacing: 0;
+  opacity: 0.6;
+}
+
+.btn.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ground);
+}
+
+/* ---- a task run in the output box ---------------------------------------- */
+
+/* One window. A task's output joins the server's own stream in the order it
+   happened, rather than taking the box over — what a person wants to see is
+   the migration and the requests it broke, together and in sequence. */
+.well {
+  position: relative;
+}
+
+/* The only thing a run adds to the box: a rule across the top while it goes,
+   and nothing at all once it has finished. The outcome lives in two places
+   that outlast it — the `exited n` line in the log, and the task's own row. */
+.run-rule {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--vermilion);
+}
+
+.well-source {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.run-square {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: var(--vermilion);
+}
+
+.run-command {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.run-outcome {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.run-outcome.loud {
+  color: var(--vermilion);
+}
+
+/* The full text of a command the row had to cut off. Anchored to the menu, not
+   the row: the list scrolls, and anything inside it would be clipped. */
+.task-peek {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  padding: 7px 11px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-all;
+  pointer-events: none;
+}
+
 /* ---- empty state -------------------------------------------------------- */
 
 .empty {

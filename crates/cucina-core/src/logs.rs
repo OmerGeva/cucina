@@ -69,6 +69,21 @@ impl Ring {
         self.buf.iter().skip(skip).cloned().collect()
     }
 
+    pub fn next_seq(&self) -> u64 {
+        self.next_seq
+    }
+
+    /// The last `n` lines numbered `seq` or higher. A task run's output shares
+    /// the server's stream, so this is how a run's own slice is picked back
+    /// out of it — for an agent polling a run it started.
+    pub fn since(&self, seq: u64, n: usize) -> Vec<LogLine> {
+        let mut out: Vec<LogLine> = self.buf.iter().filter(|l| l.seq >= seq).cloned().collect();
+        if out.len() > n {
+            out.drain(..out.len() - n);
+        }
+        out
+    }
+
     pub fn clear(&mut self) {
         self.buf.clear();
         self.emitted_seq = self.next_seq;
@@ -152,6 +167,27 @@ mod tests {
         let next = ring.take_pending();
         assert_eq!(next.len(), 1);
         assert_eq!(next[0].text, "b");
+    }
+
+    /// A run's output is interleaved with the server's, so the only thing that
+    /// marks where it began is the sequence number at the moment it started.
+    #[test]
+    fn picks_a_runs_slice_back_out_of_the_stream() {
+        let mut ring = Ring::new();
+        ring.push(Stream::Stdout, "server line");
+        let began = ring.next_seq();
+        for i in 0..4 {
+            ring.push(Stream::Stdout, &format!("run {i}"));
+        }
+
+        let slice = ring.since(began, 100);
+        assert_eq!(slice.len(), 4);
+        assert_eq!(slice[0].text, "run 0");
+
+        // Capped to the newest n, like tail.
+        assert_eq!(ring.since(began, 2)[0].text, "run 2");
+        // A run that has printed nothing yet gets nothing, not the backlog.
+        assert!(ring.since(ring.next_seq(), 100).is_empty());
     }
 
     /// Clearing must not replay the whole buffer to subscribers afterwards.
