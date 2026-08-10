@@ -130,6 +130,113 @@ impl Origin {
     }
 }
 
+/// A command the user keeps on a server — `bin/rails db:migrate`, `npm run
+/// seed`. Distinct from the server's own `command`, which is the one that
+/// starts it and never appears here.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Task {
+    /// Slugged from the command, so it is stable across runs without asking
+    /// the user to name anything. Never shown; it exists so an agent can
+    /// address a task by name in a later session.
+    pub id: String,
+    pub command: String,
+    /// How the last run ended. `Some(0)` succeeded, `Some(n)` failed, and
+    /// `None` alongside a `last_run_at` means a signal ended it — which is
+    /// what the user pressing Stop looks like from here.
+    #[serde(default)]
+    pub last_exit: Option<i32>,
+    /// `None` until it has run once, which is what the UI reads as "no
+    /// outcome to report yet".
+    #[serde(default)]
+    pub last_run_at: Option<u64>,
+}
+
+/// A command name is capped well below the session cap: it sits in a 352px
+/// menu row and anything longer is ellipsised there anyway.
+const COMMAND_MAX: usize = 300;
+
+impl Task {
+    /// A readable id derived from the command. Punctuation collapses, so two
+    /// different commands can land on the same slug — `db:migrate` and
+    /// `db_migrate` both flatten to `db-migrate`. `with_unique_id` is what
+    /// keeps them apart; this only has to be stable and legible.
+    pub fn slug(command: &str) -> String {
+        let mut out = String::with_capacity(command.len());
+        let mut prev_dash = true;
+        for ch in command.chars() {
+            if ch.is_ascii_alphanumeric() {
+                out.push(ch.to_ascii_lowercase());
+                prev_dash = false;
+            } else if !prev_dash {
+                out.push('-');
+                prev_dash = true;
+            }
+        }
+        while out.ends_with('-') {
+            out.pop();
+        }
+        if out.is_empty() {
+            out.push_str("task");
+        }
+        out.chars().take(64).collect()
+    }
+
+    pub fn new(command: &str) -> Task {
+        let command: String = command.trim().chars().take(COMMAND_MAX).collect();
+        Task {
+            id: Task::slug(&command),
+            command,
+            last_exit: None,
+            last_run_at: None,
+        }
+    }
+
+    /// Settle this task's id against the ones already on the server, the same
+    /// way `upsert` settles a server id. An agent addresses a task by this, so
+    /// two tasks sharing one would run whichever came first — silently, and
+    /// with the user's database on the other end of it.
+    pub fn with_unique_id(mut self, existing: &[Task]) -> Task {
+        let base = self.id.clone();
+        let mut n = 2;
+        while existing.iter().any(|t| t.id == self.id) {
+            self.id = format!("{base}-{n}");
+            n += 1;
+        }
+        self
+    }
+}
+
+/// One execution of a task. Unlike a server, a run is expected to end, and its
+/// exit code is the point rather than an accident.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Run {
+    pub run_id: String,
+    pub server_id: String,
+    pub task_id: String,
+    pub command: String,
+    pub started_at: u64,
+    /// `None` while it is still running. That is the only "is it live" test
+    /// there is — a run has no starting state to pass through.
+    #[serde(default)]
+    pub ended_at: Option<u64>,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub origin: Option<Origin>,
+    /// When output last arrived. A run that has gone quiet is reported, not
+    /// called stuck — `rails console` and `tail -f` are quiet on purpose.
+    #[serde(default)]
+    pub last_output_at: u64,
+}
+
+impl Run {
+    pub fn is_live(&self) -> bool {
+        self.ended_at.is_none()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
@@ -190,11 +297,18 @@ pub enum Event {
         lines: Vec<LogLine>,
     },
     ServersChanged,
+    /// A task run started, produced its first output, or ended.
+    Run(Run),
+    /// A server's task list changed — added, removed, or an outcome recorded.
+    Tasks {
+        id: String,
+        tasks: Vec<Task>,
+    },
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{slugify, Origin, State, SESSION_MAX};
+    use super::{slugify, Origin, State, Task, COMMAND_MAX, SESSION_MAX};
 
     #[test]
     fn slugs_are_stable_and_cli_friendly() {
@@ -240,6 +354,49 @@ mod tests {
         // Multi-byte input must not panic or split a character in half.
         let jp = session(&"日本語".repeat(40));
         assert_eq!(jp.chars().count(), SESSION_MAX + 1);
+    }
+
+    #[test]
+    fn task_ids_read_like_the_command_they_came_from() {
+        assert_eq!(Task::slug("bin/rails db:migrate"), "bin-rails-db-migrate");
+        assert_eq!(Task::slug("npm run dev"), "npm-run-dev");
+    }
+
+    /// Two commands that differ only in punctuation slug to the same thing.
+    /// An id that stayed collapsed would have an agent run `db_migrate` when
+    /// it asked for `db:migrate`, so the second one has to be settled.
+    #[test]
+    fn colliding_task_ids_are_settled_against_the_list() {
+        let first = Task::new("rake db:migrate");
+        let second = Task::new("rake db_migrate").with_unique_id(std::slice::from_ref(&first));
+
+        assert_eq!(first.id, "rake-db-migrate");
+        assert_eq!(second.id, "rake-db-migrate-2");
+
+        let third = Task::new("rake db.migrate").with_unique_id(&[first, second]);
+        assert_eq!(third.id, "rake-db-migrate-3");
+    }
+
+    /// An id has to come back usable whatever the command looked like — it is
+    /// what an agent addresses a task by.
+    #[test]
+    fn task_ids_are_never_empty_or_unbounded() {
+        assert_eq!(Task::slug(""), "task");
+        assert_eq!(Task::slug("!!!"), "task");
+        assert_eq!(Task::slug("日本語"), "task");
+        assert!(Task::slug(&"a".repeat(500)).chars().count() <= 64);
+    }
+
+    #[test]
+    fn a_new_task_is_trimmed_clamped_and_unrun() {
+        let task = Task::new("  bin/rails db:seed  ");
+        assert_eq!(task.command, "bin/rails db:seed");
+        assert_eq!(task.id, "bin-rails-db-seed");
+        assert!(task.last_run_at.is_none());
+        assert!(task.last_exit.is_none());
+
+        let long = Task::new(&"x".repeat(COMMAND_MAX + 100));
+        assert_eq!(long.command.chars().count(), COMMAND_MAX);
     }
 
     #[test]

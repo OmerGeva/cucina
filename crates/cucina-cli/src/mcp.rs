@@ -107,6 +107,12 @@ fn tools() -> Value {
         "type": "string",
         "description": "What this session is called. If your conversation or session already has a title, pass that verbatim. Otherwise a few words naming what you are working on — the task, ticket or feature. Shown to the user beside your name so they can tell which of your sessions started this server. Always pass it."
     });
+    // Tasks belong to one server and run in one directory, so unlike the
+    // lifecycle tools these never take a group.
+    let one_id = json!({
+        "type": "string",
+        "description": "The server's id, as shown by cucina_list. Not a group — a task runs in one directory."
+    });
     json!([
         {
             "name": "cucina_list",
@@ -200,6 +206,109 @@ fn tools() -> Value {
                 "required": ["id"],
                 "additionalProperties": false
             }
+        },
+        {
+            "name": "cucina_tasks",
+            "description": "List the tasks kept on a server — the one-off commands its owner runs there, like a migration or a test suite — with how each one ended last time. A task is not the server's own start command; use cucina_start for that.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "id": one_id },
+                "required": ["id"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_run_task",
+            "description": "Run a task that is already on the server, by its taskId from cucina_tasks. Returns a runId; poll it with cucina_run to get the exit code and output. Only one task runs at a time per server.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": one_id,
+                    "taskId": {
+                        "type": "string",
+                        "description": "The task's id, as shown by cucina_tasks."
+                    },
+                    "session": session_arg
+                },
+                "required": ["id", "taskId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_run_command",
+            "description": "Run a one-off command in a server's directory, with its environment and in whichever worktree it currently points at — and keep it on the server's task list, so the user sees what you ran and can run it again themselves. Use this for migrations, seeds, test runs and generators. Do not use it to start the server; that is cucina_start. Returns a taskId and a runId.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": one_id,
+                    "command": {
+                        "type": "string",
+                        "description": "The command, exactly as you would type it in that directory."
+                    },
+                    "session": session_arg
+                },
+                "required": ["id", "command"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_run",
+            "description": "Check on a run started by cucina_run_task or cucina_run_command: whether it is still going, its exit code once it is not, how long it took, and its output. Call this after starting a run rather than assuming it worked.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": one_id,
+                    "tail": {
+                        "type": "integer",
+                        "description": "How many recent output lines to return. Defaults to 200.",
+                        "minimum": 1,
+                        "maximum": 2000
+                    }
+                },
+                "required": ["id"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_stop_run",
+            "description": "Kill a task run and everything it spawned, including one the user started. Use it for a command that will not end on its own, like a console or a file watcher.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "runId": {
+                        "type": "string",
+                        "description": "The runId returned when the run started, or reported by cucina_run."
+                    }
+                },
+                "required": ["runId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_delete_task",
+            "description": "Take a task off a server's list. Never stops a run that is using it. The list is the user's, so remove something only when they asked you to.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "id": one_id,
+                    "taskId": {
+                        "type": "string",
+                        "description": "The task's id, as shown by cucina_tasks."
+                    }
+                },
+                "required": ["id", "taskId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_suggest_tasks",
+            "description": "What this server's project offers, read from its package.json, Gemfile, Makefile or equivalent. Call this before inventing a command — proposing what the project actually defines beats guessing at one.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "id": one_id },
+                "required": ["id"],
+                "additionalProperties": false
+            }
         }
     ])
 }
@@ -241,6 +350,28 @@ fn arg_id(args: &Value) -> Result<String, String> {
         .and_then(Value::as_str)
         .map(str::to_string)
         .ok_or_else(|| "An id is required. Call cucina_list to see them.".to_string())
+}
+
+fn arg_str<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+}
+
+/// Resolve to exactly one server. The task tools run a command in a single
+/// directory, so a group would have to mean "run it once per server", and
+/// nothing about `db:migrate` says that is what the agent meant.
+fn arg_one(c: &mut Client, args: &Value) -> Result<String, String> {
+    let key = arg_id(args)?;
+    let ids = resolve(c, &key)?;
+    match ids.len() {
+        1 => Ok(ids.into_iter().next().unwrap_or_default()),
+        n => Err(format!(
+            "{key} is a project of {n} servers. A task runs in one directory, so name the server: {}",
+            ids.join(", ")
+        )),
+    }
 }
 
 /// An id may name one server or a whole group, so an agent can bring a
@@ -395,6 +526,112 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 .map(|l| l.text.as_str())
                 .collect::<Vec<_>>()
                 .join("\n"))
+        }
+        "cucina_tasks" => {
+            let id = arg_one(&mut c, args)?;
+            let tasks = c.request(&Request::Tasks { id: id.clone() })?.tasks();
+            if tasks.is_empty() {
+                return Ok(format!(
+                    "{id} has no tasks yet. Call cucina_suggest_tasks to see what its project defines, or cucina_run_command to run something and keep it."
+                ));
+            }
+            Ok(pretty(&serde_json::to_value(tasks).unwrap_or_default()))
+        }
+        "cucina_run_task" | "cucina_run_command" => {
+            let id = arg_one(&mut c, args)?;
+            let request = if name == "cucina_run_task" {
+                let task_id = arg_str(args, "taskId")
+                    .ok_or("A taskId is required. Call cucina_tasks to see them.")?;
+                Request::RunTask {
+                    id: id.clone(),
+                    task_id: task_id.to_string(),
+                    origin,
+                }
+            } else {
+                let command = arg_str(args, "command").ok_or("A command is required.")?;
+                Request::RunCommand {
+                    id: id.clone(),
+                    command: command.to_string(),
+                    origin,
+                }
+            };
+            let run = c.request(&request)?;
+            // The run is live and the exit code is the point, so say outright
+            // that the answer is not in this reply.
+            Ok(format!(
+                "{}\n\nStarted. Poll cucina_run with id \"{id}\" for the exit code and output.",
+                pretty(&run.data)
+            ))
+        }
+        "cucina_run" => {
+            let id = arg_one(&mut c, args)?;
+            let tail = args
+                .get("tail")
+                .and_then(Value::as_u64)
+                .map(|n| n as usize)
+                .unwrap_or(200);
+            let view = c
+                .request(&Request::Run {
+                    id: id.clone(),
+                    tail: Some(tail),
+                })?
+                .run();
+            let Some(run) = view.run else {
+                return Ok(format!("{id} has not run a task yet."));
+            };
+            let elapsed = run.ended_at.unwrap_or_else(cucina_core::model::now_ms) - run.started_at;
+            let head = match (run.is_live(), run.exit_code) {
+                (true, _) => format!("running for {:.1}s", elapsed as f32 / 1000.0),
+                (false, Some(code)) => {
+                    format!("exited {code} after {:.1}s", elapsed as f32 / 1000.0)
+                }
+                (false, None) => format!("stopped after {:.1}s", elapsed as f32 / 1000.0),
+            };
+            let output: Vec<&str> = view.lines.iter().map(|l| l.text.as_str()).collect();
+            Ok(format!(
+                "{} · {head} · runId {}\n\n{}",
+                run.command,
+                run.run_id,
+                match output.is_empty() {
+                    true => "(no output)".to_string(),
+                    false => output.join("\n"),
+                }
+            ))
+        }
+        "cucina_stop_run" => {
+            let run_id = arg_str(args, "runId")
+                .ok_or("A runId is required.")?
+                .to_string();
+            c.request(&Request::StopRun {
+                run_id: run_id.clone(),
+            })?;
+            Ok(format!("{run_id} stopped."))
+        }
+        "cucina_delete_task" => {
+            let id = arg_one(&mut c, args)?;
+            let task_id = arg_str(args, "taskId")
+                .ok_or("A taskId is required. Call cucina_tasks to see them.")?;
+            c.request(&Request::RemoveTask {
+                id: id.clone(),
+                task_id: task_id.to_string(),
+            })?;
+            Ok(format!("{task_id} removed from {id}."))
+        }
+        "cucina_suggest_tasks" => {
+            let id = arg_one(&mut c, args)?;
+            let res = c.request(&Request::SuggestTasks { id: id.clone() })?;
+            let commands = res
+                .data
+                .get("commands")
+                .and_then(Value::as_array)
+                .map(|a| a.len())
+                .unwrap_or(0);
+            if commands == 0 {
+                return Ok(format!(
+                    "Nothing recognisable in {id}'s directory — no package.json, Gemfile, Makefile or equivalent that defines commands."
+                ));
+            }
+            Ok(pretty(&res.data))
         }
         other => Err(format!("Unknown tool: {other}")),
     }

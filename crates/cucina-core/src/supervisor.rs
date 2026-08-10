@@ -4,11 +4,12 @@ use crate::paths;
 use crate::ports;
 use crate::store;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader};
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread;
 use std::time::Duration;
@@ -59,6 +60,52 @@ fn wrap(command: &str) -> String {
     )
 }
 
+/// The one place a child is configured, so a task run inherits every property
+/// that makes a server well-behaved: the login shell that finds `npm`, its own
+/// process group, and the fd-3 watchdog that kills it if Cucina dies.
+fn child_command(
+    dir: &std::path::Path,
+    command: &str,
+    env: &BTreeMap<String, String>,
+    read_fd: i32,
+) -> Command {
+    let mut cmd = Command::new(paths::login_shell());
+    // A login shell so PATH, nvm, asdf and mise resolve exactly as they do
+    // in Terminal — Finder-launched apps otherwise get a bare environment.
+    cmd.arg("-lc")
+        .arg(wrap(command))
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Without this, a Finder-launched Cucina has only launchd's bare PATH
+    // and commands like `npm` are simply not found.
+    if let Some(path) = paths::login_path() {
+        cmd.env("PATH", path);
+    }
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.env("CUCINA", "1");
+    cmd.env("FORCE_COLOR", "0");
+    unsafe {
+        // Own process group, so stopping kills the whole tree rather than
+        // orphaning children. The pipe's read end lands on fd 3, where the
+        // watchdog in `wrap` waits for it.
+        cmd.pre_exec(move || {
+            libc::setsid();
+            if libc::dup2(read_fd, 3) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            if read_fd != 3 {
+                libc::close(read_fd);
+            }
+            Ok(())
+        });
+    }
+    cmd
+}
+
 struct Runtime {
     status: Status,
     pgid: Option<i32>,
@@ -84,9 +131,33 @@ impl Runtime {
     }
 }
 
+/// A task run in flight, or the last one that finished. One per server, which
+/// is the whole concurrency policy: most of these commands mutate one database
+/// in one directory, and two migrations at once is a corruption rather than an
+/// inconvenience.
+struct Active {
+    run: Run,
+    pgid: Option<i32>,
+    /// Kept alive for the duration of the run; see `watch_pipe`.
+    watch: Option<WatchPipe>,
+    /// Set when the user pressed Stop, so the exit reads as deliberate.
+    stopping: bool,
+    generation: u64,
+    /// Where this run's output starts in the server's log. A run writes into
+    /// the same stream the server does — one window, in order — so this is the
+    /// only thing that marks which lines were its own.
+    from_seq: u64,
+}
+
 pub struct Supervisor {
     servers: Mutex<Vec<Server>>,
     groups: Mutex<Vec<Group>>,
+    /// Saved commands, keyed by server id. See `store::Document::tasks` for
+    /// why these do not live on `Server`.
+    tasks: Mutex<BTreeMap<String, Vec<Task>>>,
+    /// The current or most recent task run, keyed by server id.
+    runs: Mutex<HashMap<String, Active>>,
+    next_run: AtomicU64,
     rt: Mutex<HashMap<String, Runtime>>,
     logs: Mutex<HashMap<String, Ring>>,
     listeners: Mutex<Vec<Listener>>,
@@ -117,6 +188,9 @@ impl Supervisor {
         let sup = Arc::new(Supervisor {
             servers: Mutex::new(doc.servers),
             groups: Mutex::new(doc.groups),
+            tasks: Mutex::new(doc.tasks),
+            runs: Mutex::new(HashMap::new()),
+            next_run: AtomicU64::new(1),
             rt: Mutex::new(rt),
             logs: Mutex::new(HashMap::new()),
             listeners: Mutex::new(Vec::new()),
@@ -196,10 +270,18 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Save servers alongside whatever project records we hold.
+    /// Save servers alongside whatever project records and tasks we hold.
     fn persist(&self, servers: &[Server]) -> Result<(), String> {
         let groups = self.groups.lock().unwrap().clone();
-        store::save(servers, &groups).map_err(|e| format!("Couldn't save: {e}"))
+        let tasks = self.tasks.lock().unwrap().clone();
+        store::save(servers, &groups, &tasks).map_err(|e| format!("Couldn't save: {e}"))
+    }
+
+    /// Save after a task list changed. Separate from `persist` only so callers
+    /// that already hold the server list don't have to clone it twice.
+    fn persist_tasks(&self) -> Result<(), String> {
+        let servers = self.servers.lock().unwrap().clone();
+        self.persist(&servers)
     }
 
     pub fn get(&self, id: &str) -> Option<Server> {
@@ -273,11 +355,19 @@ impl Supervisor {
 
     pub fn remove(&self, id: &str) -> Result<(), String> {
         let _ = self.stop(id);
+        // A run outlives the server's own process, so deleting the server has
+        // to take it down too or the command keeps going with nothing on
+        // screen that could stop it.
+        if let Some(run) = self.run_of(id) {
+            let _ = self.stop_run(&run.run_id);
+        }
         let mut servers = self.servers.lock().unwrap();
         servers.retain(|s| s.id != id);
         let snapshot = servers.clone();
         drop(servers);
         self.rt.lock().unwrap().remove(id);
+        self.runs.lock().unwrap().remove(id);
+        self.tasks.lock().unwrap().remove(id);
         self.logs.lock().unwrap().remove(id);
         self.persist(&snapshot)?;
         self.emit(Event::ServersChanged);
@@ -379,42 +469,7 @@ impl Supervisor {
         let (read_fd, watch) = watch_pipe()
             .map_err(|e| format!("Couldn't set up the watchdog for {}: {e}", server.name))?;
 
-        let mut cmd = Command::new(paths::login_shell());
-        // A login shell so PATH, nvm, asdf and mise resolve exactly as they do
-        // in Terminal — Finder-launched apps otherwise get a bare environment.
-        cmd.arg("-lc")
-            .arg(wrap(&server.command))
-            .current_dir(&dir)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        // Without this, a Finder-launched Cucina has only launchd's bare PATH
-        // and commands like `npm` are simply not found.
-        if let Some(path) = paths::login_path() {
-            cmd.env("PATH", path);
-        }
-        for (k, v) in &server.env {
-            cmd.env(k, v);
-        }
-        cmd.env("CUCINA", "1");
-        cmd.env("FORCE_COLOR", "0");
-        unsafe {
-            // Own process group, so stopping kills the whole tree rather than
-            // orphaning children. The pipe's read end lands on fd 3, where the
-            // watchdog in `wrap` waits for it.
-            cmd.pre_exec(move || {
-                libc::setsid();
-                if libc::dup2(read_fd, 3) < 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                if read_fd != 3 {
-                    libc::close(read_fd);
-                }
-                Ok(())
-            });
-        }
-
-        let spawned = cmd.spawn();
+        let spawned = child_command(&dir, &server.command, &server.env, read_fd).spawn();
         // The parent has no further use for the read end either way.
         unsafe { libc::close(read_fd) };
         let mut child: Child =
@@ -657,6 +712,316 @@ impl Supervisor {
         });
     }
 
+    // ---- tasks ------------------------------------------------------------
+
+    pub fn tasks(&self, id: &str) -> Vec<Task> {
+        self.tasks
+            .lock()
+            .unwrap()
+            .get(id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn emit_tasks(&self, id: &str) {
+        self.emit(Event::Tasks {
+            id: id.to_string(),
+            tasks: self.tasks(id),
+        });
+    }
+
+    /// Add a command to a server's list, or return the entry it already had.
+    /// Adding is idempotent because the id is derived from the command: typing
+    /// a command you already keep should run that one, not shadow it.
+    pub fn add_task(&self, id: &str, command: &str) -> Result<Task, String> {
+        if self.get(id).is_none() {
+            return Err(format!("No server called {id}."));
+        }
+        let task = Task::new(command);
+        if task.command.is_empty() {
+            return Err("A command is required.".into());
+        }
+        let added = {
+            let mut all = self.tasks.lock().unwrap();
+            let list = all.entry(id.to_string()).or_default();
+            // Matched on the command, not the id: two commands can slug to
+            // the same id, and it is the command the user typed that decides
+            // whether this is one they already keep.
+            match list.iter().find(|t| t.command == task.command) {
+                Some(existing) => existing.clone(),
+                None => {
+                    let task = task.with_unique_id(list);
+                    // Newest first, matching the order the menu reads in.
+                    list.insert(0, task.clone());
+                    task
+                }
+            }
+        };
+        self.persist_tasks()?;
+        self.emit_tasks(id);
+        Ok(added)
+    }
+
+    /// Forget a task. Never touches a run that is using it — the process keeps
+    /// going and the output box keeps showing it, because killing something
+    /// mid-migration to tidy a list would be the worse surprise.
+    pub fn remove_task(&self, id: &str, task_id: &str) -> Result<(), String> {
+        {
+            let mut all = self.tasks.lock().unwrap();
+            let Some(list) = all.get_mut(id) else {
+                return Err(format!("No server called {id}."));
+            };
+            let before = list.len();
+            list.retain(|t| t.id != task_id);
+            if list.len() == before {
+                return Err(format!("No task called {task_id} on {id}."));
+            }
+        }
+        self.persist_tasks()?;
+        self.emit_tasks(id);
+        Ok(())
+    }
+
+    /// The current or most recent run for a server.
+    pub fn run_of(&self, id: &str) -> Option<Run> {
+        self.runs.lock().unwrap().get(id).map(|a| a.run.clone())
+    }
+
+    pub fn find_run(&self, run_id: &str) -> Option<Run> {
+        self.runs
+            .lock()
+            .unwrap()
+            .values()
+            .find(|a| a.run.run_id == run_id)
+            .map(|a| a.run.clone())
+    }
+
+    /// Just this run's lines, pulled back out of the server's stream. The app
+    /// never needs this — it shows the whole window — but an agent that
+    /// started a run wants what the run printed, not the server's traffic
+    /// around it.
+    pub fn run_tail(&self, id: &str, n: usize) -> Vec<LogLine> {
+        let Some(from) = self.runs.lock().unwrap().get(id).map(|a| a.from_seq) else {
+            return Vec::new();
+        };
+        self.logs
+            .lock()
+            .unwrap()
+            .get(id)
+            .map(|ring| ring.since(from, n))
+            .unwrap_or_default()
+    }
+
+    /// Run a command that is not saved yet, adding it to the list. This is
+    /// exactly what the footer field does, and what an agent calls — so an
+    /// agent's command shows up in the user's list afterwards rather than
+    /// building a second, invisible history.
+    pub fn run_command(
+        self: &Arc<Self>,
+        id: &str,
+        command: &str,
+        origin: Origin,
+    ) -> Result<Run, String> {
+        let task = self.add_task(id, command)?;
+        self.run_task(id, &task.id, origin)
+    }
+
+    pub fn run_task(
+        self: &Arc<Self>,
+        id: &str,
+        task_id: &str,
+        origin: Origin,
+    ) -> Result<Run, String> {
+        let Some(server) = self.get(id) else {
+            return Err(format!("No server called {id}."));
+        };
+        let Some(task) = self.tasks(id).into_iter().find(|t| t.id == task_id) else {
+            return Err(format!("No task called {task_id} on {id}."));
+        };
+        // Refused rather than queued, and the active run is named: an agent
+        // that did not know a migration was already going should be told which
+        // one, not left to wait on something it cannot see.
+        if let Some(active) = self.run_of(id).filter(Run::is_live) {
+            return Err(format!(
+                "{} is already running `{}` (run {}). Only one task runs at a time per server.",
+                server.name, active.command, active.run_id
+            ));
+        }
+
+        let dir = paths::expand_tilde(&server.dir);
+        if !dir.is_dir() {
+            return Err(format!("{} no longer exists.", dir.display()));
+        }
+
+        let (read_fd, watch) =
+            watch_pipe().map_err(|e| format!("Couldn't set up the watchdog: {e}"))?;
+        let spawned = child_command(&dir, &task.command, &server.env, read_fd).spawn();
+        unsafe { libc::close(read_fd) };
+        let mut child: Child =
+            spawned.map_err(|e| format!("Couldn't run {}: {e}", task.command))?;
+
+        let pgid = child.id() as i32;
+        let started = now_ms();
+        let run = Run {
+            run_id: format!("run-{}", self.next_run.fetch_add(1, Ordering::SeqCst)),
+            server_id: id.to_string(),
+            task_id: task.id.clone(),
+            command: task.command.clone(),
+            started_at: started,
+            ended_at: None,
+            exit_code: None,
+            origin: Some(origin),
+            last_output_at: started,
+        };
+
+        // Where this run's lines begin in the server's stream. Read before the
+        // first line is written, so the banner below is part of the run.
+        let from_seq = self
+            .logs
+            .lock()
+            .unwrap()
+            .entry(id.to_string())
+            .or_default()
+            .next_seq();
+
+        let generation = {
+            let mut runs = self.runs.lock().unwrap();
+            let slot = runs.entry(id.to_string()).or_insert(Active {
+                run: run.clone(),
+                pgid: None,
+                watch: None,
+                stopping: false,
+                generation: 0,
+                from_seq,
+            });
+            slot.generation += 1;
+            slot.run = run.clone();
+            slot.pgid = Some(pgid);
+            slot.watch = Some(watch);
+            slot.stopping = false;
+            slot.from_seq = from_seq;
+            slot.generation
+        };
+
+        self.log(id, Stream::System, &format!("$ {}", task.command));
+        self.emit(Event::Run(run.clone()));
+
+        if let Some(out) = child.stdout.take() {
+            self.pipe_run(id, out, Stream::Stdout, generation);
+        }
+        if let Some(err) = child.stderr.take() {
+            self.pipe_run(id, err, Stream::Stderr, generation);
+        }
+        self.monitor_run(id.to_string(), child, generation);
+        Ok(run)
+    }
+
+    /// Read one of a run's pipes into the server's own log. Simpler than the
+    /// server's: there is no state to promote and no port to look for, only
+    /// the clock on last output.
+    fn pipe_run<R: std::io::Read + Send + 'static>(
+        self: &Arc<Self>,
+        id: &str,
+        reader: R,
+        stream: Stream,
+        generation: u64,
+    ) {
+        let sup = self.clone();
+        let id = id.to_string();
+        thread::spawn(move || {
+            let mut buf = BufReader::new(reader);
+            let mut line = Vec::new();
+            loop {
+                line.clear();
+                match buf.read_until(b'\n', &mut line) {
+                    Ok(0) | Err(_) => return,
+                    Ok(_) => {}
+                }
+                {
+                    let mut runs = sup.runs.lock().unwrap();
+                    match runs.get_mut(&id) {
+                        Some(a) if a.generation == generation => a.run.last_output_at = now_ms(),
+                        _ => return,
+                    }
+                }
+                sup.log(&id, stream, &String::from_utf8_lossy(&line));
+            }
+        });
+    }
+
+    /// Reap a run and record how it ended on the task it came from.
+    fn monitor_run(self: &Arc<Self>, id: String, mut child: Child, generation: u64) {
+        let sup = self.clone();
+        thread::spawn(move || {
+            let code = child.wait().ok().and_then(|s| s.code());
+
+            let (finished, task_id) = {
+                let mut runs = sup.runs.lock().unwrap();
+                let Some(a) = runs.get_mut(&id) else { return };
+                if a.generation != generation {
+                    return; // superseded by a newer run
+                }
+                a.pgid = None;
+                a.watch = None; // the run is over; let the pipe go
+                a.run.ended_at = Some(now_ms());
+                a.run.exit_code = code;
+                (a.run.clone(), a.run.task_id.clone())
+            };
+
+            {
+                let mut all = sup.tasks.lock().unwrap();
+                if let Some(task) = all
+                    .get_mut(&id)
+                    .and_then(|list| list.iter_mut().find(|t| t.id == task_id))
+                {
+                    task.last_exit = code;
+                    task.last_run_at = finished.ended_at;
+                }
+            }
+
+            let secs = finished
+                .ended_at
+                .unwrap_or_default()
+                .saturating_sub(finished.started_at) as f32
+                / 1000.0;
+            let note = match code {
+                Some(c) => format!("exited {c} after {secs:.1}s"),
+                None => format!("stopped after {secs:.1}s"),
+            };
+            sup.log(&id, Stream::System, &note);
+
+            let _ = sup.persist_tasks();
+            sup.emit(Event::Run(finished));
+            sup.emit_tasks(&id);
+        });
+    }
+
+    /// Stop a run, including one the user started from the app. Same escalation
+    /// as a server: SIGTERM to the group, SIGKILL if it will not go.
+    pub fn stop_run(&self, run_id: &str) -> Result<(), String> {
+        let pgid = {
+            let mut runs = self.runs.lock().unwrap();
+            let Some(a) = runs.values_mut().find(|a| a.run.run_id == run_id) else {
+                return Err(format!("No run called {run_id}."));
+            };
+            if !a.run.is_live() {
+                return Ok(()); // already finished; nothing to do
+            }
+            a.stopping = true;
+            a.pgid
+        };
+        let Some(pgid) = pgid else { return Ok(()) };
+
+        kill_group(pgid, libc::SIGTERM);
+        thread::spawn(move || {
+            thread::sleep(TERM_GRACE);
+            if group_alive(pgid) {
+                kill_group(pgid, libc::SIGKILL);
+            }
+        });
+        Ok(())
+    }
+
     pub fn stop(&self, id: &str) -> Result<(), String> {
         let pgid = {
             let mut rt = self.rt.lock().unwrap();
@@ -761,7 +1126,7 @@ impl Supervisor {
 
     /// Kill every running process. Called on quit so nothing is orphaned.
     pub fn shutdown(&self) {
-        let groups: Vec<i32> = {
+        let mut groups: Vec<i32> = {
             let mut rt = self.rt.lock().unwrap();
             rt.values_mut()
                 .filter_map(|r| {
@@ -770,6 +1135,17 @@ impl Supervisor {
                 })
                 .collect()
         };
+        // Task runs die with the app for the same reason servers do: a
+        // migration nobody can see is worse than one that was interrupted.
+        groups.extend({
+            let mut runs = self.runs.lock().unwrap();
+            runs.values_mut()
+                .filter_map(|a| {
+                    a.stopping = true;
+                    a.pgid.take()
+                })
+                .collect::<Vec<i32>>()
+        });
         for pgid in &groups {
             kill_group(*pgid, libc::SIGTERM);
         }
