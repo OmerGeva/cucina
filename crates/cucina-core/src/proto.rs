@@ -105,6 +105,15 @@ pub enum Request {
     SuggestTasks {
         id: String,
     },
+
+    // ---- strays: ports held by processes Cucina does not own --------------
+    /// Look at what is listening right now. Runs three bounded probes; there
+    /// is no cached answer, because a cached one would be a lie by the time
+    /// anybody read it.
+    Strays,
+    StopStray {
+        pid: u32,
+    },
 }
 
 impl Origin {
@@ -161,6 +170,10 @@ impl Response {
     }
 
     pub fn run(&self) -> RunView {
+        serde_json::from_value(self.data.clone()).unwrap_or_default()
+    }
+
+    pub fn strays(&self) -> Vec<crate::strays::Stray> {
         serde_json::from_value(self.data.clone()).unwrap_or_default()
     }
 }

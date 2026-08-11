@@ -216,6 +216,16 @@ fn dispatch(sup: &Arc<Supervisor>, req: Request) -> Response {
             }
             None => Response::err(format!("No server called {id}.")),
         },
+
+        Request::Strays => match sup.strays() {
+            Ok(found) => json(found),
+            Err(e) => Response::err(e),
+        },
+
+        Request::StopStray { pid } => match sup.stop_stray(pid) {
+            Ok(()) => Response::empty(),
+            Err(e) => Response::err(e),
+        },
     }
 }
 

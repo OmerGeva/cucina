@@ -20,6 +20,7 @@ name on it, and you can stop it yourself.
 - **A CLI and an MCP server**, so agents can start, stop, read logs and switch branches
 - **Git worktree switching** — move a server between worktrees; it restarts there
 - **Projects** — group servers and bring a whole stack up at once
+- **Strays** — finds the dev servers still holding a port that nobody owns, and ends them
 - **Crash-safe** — if Cucina quits, crashes, or is force-killed, its servers die with it
 - **Quiet** — no idle polling, no timers, no looping animations; it does nothing when
   nothing is happening
@@ -108,6 +109,29 @@ Output goes into the server's own log, in the order it happened, so you can see 
 and the requests it broke together. One task runs at a time per server: most of these touch
 one database in one directory, and two at once is a corruption rather than an inconvenience.
 
+## Strays
+
+A **stray** is a process holding a port that Cucina does not own — a dev server an agent
+started and walked away from, a `npm run dev` from a terminal tab you closed last week. They
+are why `EADDRINUSE` happens, and they are invisible until you go looking with `lsof`.
+
+Cucina looks each time the window comes forward, and when it finds any, a **Strays** entry
+appears in the rail with the count on it. The page lists what is holding what: the port, the
+directory, the command as the kernel has it, how long it has been there, and its pid.
+
+- **Stop** ends it — armed in place, because clearing up six of these should not be six
+  dialogs. There is no undo offered, because there is none: restarting it would be a
+  different process with a different pid. A receipt naming the dead pid takes its place.
+- **Adopt** opens the Add form pre-filled, with the command flagged. A scanned command line
+  is a runtime artefact — absolute interpreter paths, resolved shims — not a start command,
+  and adopting one unedited would give you a server that fails on its second launch.
+
+A process with a terminal behind it is named rather than marked: that is somebody's live
+work, not an escapee. Only the ones with nothing behind them carry the vermilion square.
+
+Nothing runs on a timer, and installed applications and system agents are left out — Control
+Centre on port 5000 all day is not news.
+
 ## The command line
 
 Settings → Agents → **Install** puts `cucina` in `~/.local/bin`.
@@ -120,6 +144,8 @@ cucina logs api --tail 50   # see why it broke
 cucina down api             # stop it
 cucina worktrees api        # list the branches it can run from
 cucina switch api main      # move it to another worktree, restarting if it's up
+cucina strays               # what's holding a port that isn't Cucina's
+cucina stop-stray 12904     # end one of them
 ```
 
 Any id also accepts a project name, so one call brings a whole stack up.
@@ -150,6 +176,10 @@ Seven more for its tasks: `cucina_tasks`, `cucina_run_task`, `cucina_run_command
 `cucina_run`, `cucina_stop_run`, `cucina_delete_task`, `cucina_suggest_tasks`.
 `cucina_run_command` is the one agents reach for — it runs a command and keeps it, so
 anything an agent ran is in your list afterwards rather than in a history you never see.
+
+Two for what it does not own: `cucina_strays` and `cucina_stop_stray`. An agent that finds a
+port already taken can ask what has it instead of guessing, and often the answer is a server
+it left behind itself.
 
 Agents identify themselves in the MCP handshake, so a server started by one carries its
 mark — Claude Code, Codex and Cursor are recognised on sight, and anything else is credited
@@ -228,7 +258,8 @@ npm run dev       # then open http://localhost:1420/preview.html
 
 `preview.html` renders the real components against a stubbed Tauri bridge, so the UI can be
 worked on in a browser without building the Rust side. `?at=settings`, `?at=server:api` and
-`?at=add` open a specific screen.
+`?at=add` open a specific screen; `?at=strays&strays=none|one|slow|fail` opens each of that
+page's states.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 

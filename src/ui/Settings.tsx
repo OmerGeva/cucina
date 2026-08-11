@@ -2,8 +2,12 @@ import { useEffect, useState } from 'react'
 import type { UpdateInfo } from '../api'
 import { api } from '../api'
 
+interface Props {
+  onScanStrays: () => void
+}
+
 /** Everything configurable lives here, so there is one place to look. */
-export default function Settings() {
+export default function Settings({ onScanStrays }: Props) {
   const [atLogin, setAtLogin] = useState(false)
   const [snippet, setSnippet] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
@@ -132,6 +136,25 @@ export default function Settings() {
             </small>
           </span>
         </label>
+      </section>
+
+      {/* The rail entry is absent at zero, which is most days. This line is the
+          only reason the page stays reachable when there is nothing on it. */}
+      <section className="panel">
+        <h2 className="panel-title">Strays</h2>
+        <div className="panel-row">
+          <div>
+            <strong className="panel-label">Scan for strays</strong>
+            <p className="prose">
+              Processes holding a port that Cucina does not own — a dev server left behind by a
+              shell that went away. Cucina looks each time the window comes forward, and puts them
+              in the rail when it finds any.
+            </p>
+          </div>
+          <button className="btn" onClick={onScanStrays}>
+            Open
+          </button>
+        </div>
       </section>
 
       <section className="panel">

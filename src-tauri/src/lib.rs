@@ -3,7 +3,7 @@ mod tray;
 use cucina_core::manifest::Suggestions;
 use cucina_core::model::{Event, Group, LogLine, Origin, Run, Server, Task};
 use cucina_core::proto::ServerView;
-use cucina_core::{ipc, paths, Supervisor};
+use cucina_core::{ipc, paths, Stray, Supervisor};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
@@ -153,6 +153,20 @@ fn suggest_tasks(state: State<'_, AppState>, id: String) -> Suggestions {
         .map(|t| t.command)
         .collect();
     cucina_core::manifest::suggest(&paths::expand_tilde(&server.dir), &server.command, &kept)
+}
+
+/// Runs the probes and answers. Deliberately has no cached companion: the
+/// caller asks when the window comes forward and when Scan is pressed, and a
+/// stored list would be wrong by the time anybody read it.
+#[tauri::command]
+fn scan_strays(state: State<'_, AppState>) -> Result<Vec<Stray>, String> {
+    state.sup.strays()
+}
+
+/// Blocks for as long as the process takes to go, up to about three seconds.
+#[tauri::command]
+async fn stop_stray(state: State<'_, AppState>, pid: u32) -> Result<(), String> {
+    state.sup.stop_stray(pid)
 }
 
 #[tauri::command]
@@ -428,6 +442,8 @@ pub fn run() {
             delete_task,
             read_run,
             suggest_tasks,
+            scan_strays,
+            stop_stray,
             open_url,
             reveal_in_finder,
             pick_directory,

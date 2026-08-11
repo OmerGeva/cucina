@@ -309,6 +309,30 @@ fn tools() -> Value {
                 "required": ["id"],
                 "additionalProperties": false
             }
+        },
+        {
+            "name": "cucina_strays",
+            "description": "Every process holding a TCP port that Cucina does not own — a dev server left behind by a shell that went away, often from an earlier session of yours. Call this when a port is already in use and you need to know what has it. Each result carries its pid, port, working directory, age, and the terminal behind it if there is one; a stray with no owner is an orphan nobody is watching.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "cucina_stop_stray",
+            "description": "Stop a process Cucina does not own, by pid, taken from cucina_strays. This kills something the user did not start through Cucina and cannot be undone — restarting it later is a different process. Ask the user first unless they have already told you to clear it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "pid": {
+                        "type": "integer",
+                        "description": "The pid, as shown by cucina_strays."
+                    }
+                },
+                "required": ["pid"],
+                "additionalProperties": false
+            }
         }
     ])
 }
@@ -632,6 +656,24 @@ fn call(name: &str, args: &Value) -> Result<String, String> {
                 ));
             }
             Ok(pretty(&res.data))
+        }
+        "cucina_strays" => {
+            let found = c.request(&Request::Strays)?.strays();
+            if found.is_empty() {
+                return Ok(
+                    "Nothing loose. Every process holding a port right now is one of Cucina's."
+                        .to_string(),
+                );
+            }
+            Ok(pretty(&serde_json::to_value(found).unwrap_or_default()))
+        }
+        "cucina_stop_stray" => {
+            let pid = args
+                .get("pid")
+                .and_then(Value::as_u64)
+                .ok_or("A pid is required. Call cucina_strays to see them.")?;
+            c.request(&Request::StopStray { pid: pid as u32 })?;
+            Ok(format!("pid {pid} is gone."))
         }
         other => Err(format!("Unknown tool: {other}")),
     }
