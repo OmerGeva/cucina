@@ -11,9 +11,11 @@ pub mod paths;
 pub mod ports;
 pub mod proto;
 pub mod store;
+pub mod strays;
 pub mod supervisor;
 
 pub use git::Worktree;
 pub use model::{Event, Group, LogLine, Origin, Run, Server, State, Status, Stream, Task};
 pub use proto::{Request, Response, ServerView};
+pub use strays::Stray;
 pub use supervisor::Supervisor;

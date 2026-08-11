@@ -6,7 +6,7 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { LogLine, Run, ServerView, Task } from './api'
+import type { LogLine, Run, ServerView, Stray, Task } from './api'
 import './fonts.css'
 import './styles.css'
 
@@ -241,6 +241,64 @@ const RUN_OUTPUT: Record<string, string[]> = {
   quiet: ['$ bin/rails console', 'Loading development environment (Rails 7.1.3)', 'irb(main):001:0>'],
 }
 
+/* Six results, covering every row shape at once: orphan and terminal-owned,
+   a long line that has to ellipsise, and one with no working directory whose
+   command promotes into the first line. `?strays=` picks the state:
+   ?at=strays&strays=none | one | slow | fail */
+const STRAYS: Stray[] = [
+  {
+    port: 5173,
+    pid: 80338,
+    command: 'node /Users/you/code/acme/web/node_modules/.bin/vite --host',
+    dir: `${HOME}/code/acme/web`,
+    age: 156_000,
+  },
+  {
+    port: 3000,
+    pid: 44219,
+    command: 'next-server (v14.2.3)',
+    dir: `${HOME}/code/acme/marketing`,
+    age: 15_120,
+    owner: 'ZSH S004',
+  },
+  {
+    port: 8000,
+    pid: 12904,
+    command:
+      '/Users/you/.venvs/spike/bin/python -m uvicorn app.main:app --reload --port 8000 --log-level debug --workers 1 --host 0.0.0.0',
+    dir: `${HOME}/code/scratch/api-spike`,
+    age: 183_600,
+  },
+  {
+    port: 4321,
+    pid: 60117,
+    command: 'node /Users/you/code/personal/notes-site/node_modules/astro/astro.js dev',
+    dir: `${HOME}/code/personal/notes-site`,
+    age: 21_780,
+  },
+  {
+    port: 7777,
+    pid: 51204,
+    command: 'bun run --hot src/index.ts',
+    dir: `${HOME}/code/acme/edge`,
+    age: 1_320,
+    owner: 'ZSH S011',
+  },
+  {
+    port: 54123,
+    pid: 77650,
+    command: 'node /Users/you/.npm/_npx/8ab3f1/node_modules/.bin/http-server -p 54123 --cors -c-1',
+    dir: null,
+    age: 460_800,
+  },
+]
+
+const strayState = new URLSearchParams(location.search).get('strays') ?? ''
+const STRAY_RESULT: Record<string, Stray[]> = {
+  none: [],
+  one: STRAYS.slice(0, 1),
+}
+
 const RESPONSES: Record<string, unknown> = {
   list_servers: VIEWS,
   list_groups: [{ name: 'acme', icon: '' }],
@@ -295,9 +353,25 @@ if (staged) {
     return id
   },
   invoke: async (command: string, args: Record<string, unknown> = {}) => {
+    if (command === 'scan_strays') {
+      // `slow` holds the scan open long enough to look at it; `fail` throws the
+      // way the real probe does, so the failed state keeps its last timestamp.
+      if (strayState === 'slow') await new Promise((go) => setTimeout(go, 30_000))
+      if (strayState === 'fail') throw 'lsof: exited 1 — no such file or directory'
+      return STRAY_RESULT[strayState] ?? STRAYS
+    }
+    if (command === 'stop_stray') {
+      const i = STRAYS.findIndex((s) => s.pid === args.pid)
+      if (i >= 0) STRAYS.splice(i, 1)
+      console.log(`[harness] stop_stray ${args.pid}`)
+      return null
+    }
     if (command === 'read_logs') return LOGS[args.id as string] ?? []
     if (command === 'list_tasks') return TASKS[args.id as string] ?? []
     if (command === 'suggest_tasks') {
+      // A directory with no package.json, Gemfile or Makefile offers nothing,
+      // which with no tasks kept is the only way to see the empty menu.
+      if (args.id === 'docs') return { source: '', commands: [] }
       // Mirrors `manifest::suggest`: whatever the project offers, minus what
       // the user already keeps. Offering a command twice is the bug this
       // filter exists to prevent, so the harness has to have it too.

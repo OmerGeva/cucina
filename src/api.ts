@@ -86,6 +86,22 @@ export interface Run {
   lastOutputAt: number
 }
 
+/** A process holding a port that Cucina does not own. Observed, never stored —
+    every scan replaces the list outright. */
+export interface Stray {
+  port: number
+  pid: number
+  /** The command line as the kernel has it: resolved shims, absolute
+      interpreter paths, whatever flags an agent added. Not a start command. */
+  command: string
+  /** Null when it could not be read — usually a directory since deleted. */
+  dir?: string | null
+  /** Seconds since it started. */
+  age: number
+  /** The terminal behind it, `ZSH S004`. Null means nothing is behind it. */
+  owner?: string | null
+}
+
 export interface Suggestions {
   /** The manifest the commands were read from, for the menu header. */
   source: string
@@ -162,6 +178,8 @@ export const api = {
   deleteTask: (id: string, taskId: string) => invoke<void>('delete_task', { id, taskId }),
   readRun: (id: string) => invoke<Run | null>('read_run', { id }),
   suggestTasks: (id: string) => invoke<Suggestions>('suggest_tasks', { id }),
+  strays: () => invoke<Stray[]>('scan_strays'),
+  stopStray: (pid: number) => invoke<void>('stop_stray', { pid }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),
   reveal: (path: string) => invoke<void>('reveal_in_finder', { path }),
   pickDirectory: () => invoke<string | null>('pick_directory'),
@@ -233,6 +251,29 @@ const SPELLED = [
 
 /** Small counts read better spelled out in the hero caption. */
 export const spell = (n: number) => (n < SPELLED.length ? SPELLED[n] : String(n))
+
+/** Nothing is behind it. The reason strays exist as a page at all. */
+export const isOrphan = (stray: Stray): boolean => !stray.owner
+
+/** How long a stray has been loose: `22m`, `4h 12m`, `5d 8h`. Coarser than
+    `uptime` on purpose — at this age the minutes stopped mattering. */
+export function ageOf(secs: number): string {
+  if (secs < 60) return `${Math.max(0, Math.floor(secs))}s`
+  const m = Math.floor(secs / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return h ? `${h}h ${m % 60}m` : `${m % 60}m`
+  const d = Math.floor(h / 24)
+  return `${d}d ${h % 24}h`
+}
+
+/** "scanned 40s ago" — the freshness of the list, in the same place in every
+    state, because a stale list of processes is worse than no list. */
+export function sinceScan(at: number, now: number): string {
+  const secs = Math.max(0, Math.floor((now - at) / 1000))
+  if (secs < 5) return 'just now'
+  return `${ageOf(secs)} ago`
+}
 
 /** The agents we can recognise on sight. Anything else is still credited, it
     just appears under whatever name it gave us, without a mark. */

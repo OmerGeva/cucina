@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Group, LogLine, Server, ServerView, Status, Worktree } from './api'
-import { api, blankServer, isLive, onEvent } from './api'
+import type { Group, LogLine, Server, ServerView, Status, Stray, Worktree } from './api'
+import { api, blankServer, isLive, onEvent, parentFolder } from './api'
 import Rail from './ui/Rail'
 import type { Route } from './ui/Rail'
 import Home from './ui/Home'
 import Detail from './ui/Detail'
 import Editor from './ui/Editor'
 import Settings from './ui/Settings'
+import Strays from './ui/Strays'
 
 /** Matches the supervisor's ring buffer, so scrollback stays bounded. */
 const MAX_LINES = 2000
@@ -31,6 +32,14 @@ export default function App() {
   )
   const [home, setHome] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  // Strays are observed, never stored: the list, when it was taken, and what
+  // went wrong if the probe failed. Held here rather than in the page, because
+  // the rail shows the count whether or not the page is open.
+  const [strays, setStrays] = useState<Stray[]>([])
+  const [scannedAt, setScannedAt] = useState<number | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [adopting, setAdopting] = useState<string | null>(null)
 
   // The listener registers once and reads the open server through a ref,
   // rather than re-subscribing on every navigation.
@@ -67,6 +76,35 @@ export default function App() {
     void refresh()
     void api.homeDir().then(setHome)
   }, [refresh])
+
+  // Reading the process table is cheap but not free, and a list of processes
+  // goes stale the moment it is taken — so it is read when the window comes
+  // forward and when Scan is pressed, and on no timer whatsoever.
+  //
+  // `loud` draws the scanning state. A scan the user asked for should show its
+  // work; one that follows a stop, or comes with the window, should not throw
+  // the list they are reading away and put skeletons in its place.
+  const scan = useCallback(async (loud = false) => {
+    if (loud) setScanning(true)
+    try {
+      setStrays(await api.strays())
+      setScannedAt(Date.now())
+      setScanError(null)
+    } catch (e) {
+      // The last good list and its timestamp both stay: an empty list would
+      // read as good news, which is the opposite of what happened.
+      setScanError(String(e))
+    } finally {
+      setScanning(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void scan(true)
+    const quiet = () => void scan()
+    window.addEventListener('focus', quiet)
+    return () => window.removeEventListener('focus', quiet)
+  }, [scan])
 
   useEffect(() => {
     const pending = onEvent((event) => {
@@ -118,7 +156,24 @@ export default function App() {
     return () => clearInterval(id)
   }, [anyLive])
 
-  const addServer = useCallback(() => setEditing(blankServer()), [])
+  const addServer = useCallback(() => {
+    setAdopting(null)
+    setEditing(blankServer())
+  }, [])
+
+  /** Adopt opens the Add sheet already filled in. The stray keeps running —
+      Cucina does not own it until it is started from here. */
+  const adopt = useCallback((stray: Stray) => {
+    const dir = stray.dir ?? ''
+    setAdopting(stray.command)
+    setEditing({
+      ...blankServer(),
+      name: dir.split('/').filter(Boolean).pop() ?? '',
+      dir,
+      command: stray.command,
+      group: parentFolder(dir),
+    })
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -178,6 +233,7 @@ export default function App() {
         route={route}
         groups={groups}
         views={views}
+        strays={strays.length}
         onRoute={setRoute}
         onAdd={addServer}
       />
@@ -186,7 +242,23 @@ export default function App() {
         <div className="page-drag" data-tauri-drag-region />
 
         {route.kind === 'settings' ? (
-          <Settings />
+          <Settings onScanStrays={() => setRoute({ kind: 'strays' })} />
+        ) : route.kind === 'strays' ? (
+          <Strays
+            strays={strays}
+            at={scannedAt}
+            scanning={scanning}
+            error={scanError}
+            home={home}
+            onScan={() => void scan(true)}
+            onStop={async (pid) => {
+              await api.stopStray(pid)
+              // The row leaves and the count on the rail drops, both because
+              // the list is read again rather than edited in place.
+              await scan()
+            }}
+            onAdopt={adopt}
+          />
         ) : current ? (
           <Detail
             view={current}
@@ -229,16 +301,22 @@ export default function App() {
           server={editing}
           home={home}
           groups={groupNames}
+          observed={adopting ?? undefined}
           onSaved={(saved) => {
             setEditing(null)
+            setAdopting(null)
             void refresh().then(() => setRoute({ kind: 'server', id: saved.id }))
           }}
           onDeleted={() => {
             setEditing(null)
+            setAdopting(null)
             setRoute({ kind: 'all' })
             void refresh()
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            setEditing(null)
+            setAdopting(null)
+          }}
         />
       ) : null}
     </div>

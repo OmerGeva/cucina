@@ -1022,6 +1022,37 @@ impl Supervisor {
         Ok(())
     }
 
+    // ---- strays: ports held by processes that are not ours -----------------
+
+    /// Every process group Cucina answers for — its own, its servers', and any
+    /// task run in flight. Everything else listening is a stray.
+    fn own_groups(&self) -> Vec<i32> {
+        // Cucina's own group covers the app, the CLI talking to it, and any
+        // helper either of them spawned.
+        let mut groups = vec![unsafe { libc::getpgrp() }];
+        groups.extend(self.rt.lock().unwrap().values().filter_map(|r| r.pgid));
+        groups.extend(self.runs.lock().unwrap().values().filter_map(|a| a.pgid));
+        groups.sort_unstable();
+        groups.dedup();
+        groups
+    }
+
+    pub fn strays(&self) -> Result<Vec<crate::strays::Stray>, String> {
+        crate::strays::scan(&self.own_groups())
+    }
+
+    /// Stop something Cucina does not own. Refuses anything that turns out to
+    /// be one of ours, so a stale list cannot be used to kill a live server
+    /// behind the supervisor's back — that is what the Stop button is for.
+    pub fn stop_stray(&self, pid: u32) -> Result<(), String> {
+        if self.strays()?.iter().all(|s| s.pid != pid) {
+            return Err(format!(
+                "pid {pid} is not a stray any more. Scan again to see what is out there."
+            ));
+        }
+        crate::strays::stop(pid)
+    }
+
     pub fn stop(&self, id: &str) -> Result<(), String> {
         let pgid = {
             let mut rt = self.rt.lock().unwrap();

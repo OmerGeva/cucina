@@ -1190,6 +1190,14 @@ label.toggle input {
   padding: 22px 24px;
   text-align: center;
   font-size: 12.5px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+/* The state on its own line, then what to do about it. Run together they wrap
+   wherever the box happens to end, which reads as one long apology. */
+.tasks-empty span {
+  display: block;
   color: var(--ink-3);
 }
 
@@ -1228,11 +1236,25 @@ label.toggle input {
   box-shadow: 0 0 0 2px rgba(232, 64, 42, 0.16);
 }
 
-.btn .caret {
+/* The one button in the app that carries an icon, so it becomes a flex box
+   here rather than `.btn` doing so everywhere — `.btn.wide` centres its label
+   with `text-align`, which an anonymous flex item does not answer to. */
+.tasks-anchor > .btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Sized like the select's, which is the other caret sitting beside a word. */
+.tasks-anchor > .btn svg {
+  width: 9px;
+  height: 9px;
   margin-left: 7px;
-  font-size: 9px;
-  letter-spacing: 0;
+  flex: none;
   opacity: 0.6;
+}
+
+.tasks-anchor > .btn.on svg {
+  opacity: 0.75;
 }
 
 .btn.on {
@@ -1963,4 +1985,377 @@ label.toggle input {
   border: 1px solid rgba(26, 24, 21, 0.18);
   padding: 1px 5px;
   flex: none;
+}
+
+/* ---- strays -------------------------------------------------------------- */
+
+/* Deliberately left to `.rail-btn svg`, which is 15px: this mark is built from
+   Home's own square at Home's own scale, so anything that resized it here
+   would undo the point. Centred, and the badge lands on the top-right grid
+   square and covers part of it — two marks stacked read as one object, where
+   a mark shunted aside to clear room for a badge reads as a mistake. */
+
+/* Square, like every other mark here. The rounded pill was the one shape in
+   this design that did not belong. */
+.rail-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2px;
+  display: grid;
+  place-items: center;
+  background: var(--vermilion);
+  color: #fff;
+  font: 700 9px/1 var(--ui);
+  letter-spacing: -0.01em;
+}
+
+.page-note {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 68ch;
+  margin: -6px 0 16px;
+}
+
+/* The legend gets its own line and steps back a shade: it explains the list
+   rather than describing it, and it says the same thing on every visit. */
+.page-legend {
+  display: block;
+  color: var(--ink-3);
+}
+
+/* Always in the same place, in every state — the age of the answer matters as
+   much as the answer, and a list of processes goes stale as you read it. */
+.scan-stamp {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.scan-stamp.loud {
+  font-family: var(--ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--vermilion);
+}
+
+.panel.strays {
+  padding: 0;
+  gap: 0;
+  display: block;
+  position: relative;
+}
+
+.stray {
+  display: grid;
+  grid-template-columns: 20px 74px 1fr 92px 150px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--hairline);
+  cursor: default;
+}
+
+.stray:first-child {
+  border-top: none;
+}
+
+.stray.open,
+.stray:hover:not(.head):not(.skeleton) {
+  background: var(--tint);
+}
+
+.stray.head {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 10px 18px;
+}
+
+.stray.head .right {
+  text-align: right;
+}
+
+/* The one mark on the row, and it means one thing: nothing is behind this. */
+.stray-square {
+  width: 9px;
+  height: 9px;
+  background: var(--vermilion);
+}
+
+/* The same square, set into the caption that explains it — a legend has to be
+   the mark itself, not a description of one. */
+.stray-square.inline {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 1px;
+}
+
+/* Card-numeral size — the port is what you came to read. */
+.stray-port {
+  font: 700 26px/1 var(--ui);
+  letter-spacing: -0.045em;
+}
+
+.stray-where {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stray-dir {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+
+.stray-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A terminal owning a process is ordinary work, so it is named rather than
+   marked — quietly, beside where it is running. */
+.stray-owner {
+  font-family: var(--ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.stray-command {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  /* Rows never wrap: a 200-character npx line would otherwise make every row
+     tall. Clicking one opens it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Same promotion the Tasks list uses: with no directory the command takes the
+   first line and the caption takes the second. */
+.stray-command.caption {
+  font-family: var(--ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.stray.open .stray-path,
+.stray.open .stray-command {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.stray-age {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  text-align: right;
+  display: grid;
+  gap: 2px;
+}
+
+.stray-pid {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.stray-acts {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+/* Vermilion and filled, because this is the press that cannot be taken back.
+   The hover has to restate the fill: `.btn.danger:hover` sets `background:
+   none`, and white text on no background is an invisible button under the
+   very pointer that is about to press it. */
+.stray-acts .btn.danger,
+.stray-acts .btn.danger:hover:not(:disabled) {
+  background: var(--vermilion);
+  border-color: var(--vermilion);
+  color: #fff;
+}
+
+.stray-acts .btn.danger:hover:not(:disabled) {
+  opacity: 0.86;
+}
+
+/* The armed pair is two words where there was one, and it has the same 150px
+   to live in — so it is set tighter rather than allowed to reach back across
+   the age and the pid. */
+.stray-acts .btn.danger,
+.stray-acts .btn.danger + .btn {
+  padding: 7px 10px;
+  letter-spacing: 0.14em;
+}
+
+.stray-receipt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--tint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  animation: fade 200ms var(--ease-out);
+}
+
+/* Hollow: the process is gone, and the mark it carried on its row goes with
+   it. */
+.receipt-square {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--rule);
+  flex: none;
+}
+
+.scan-rule {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--vermilion);
+  animation: scan-sweep 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes scan-sweep {
+  from {
+    width: 6%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.stray.skeleton .bar {
+  height: 11px;
+  background: var(--wash);
+}
+
+.stray.skeleton .bar.port {
+  height: 17px;
+}
+
+.stray.skeleton .bar.wide {
+  width: 62%;
+}
+
+.stray.skeleton .bar.mid {
+  width: 44%;
+}
+
+.stray.skeleton .bar.narrow {
+  width: 51%;
+}
+
+.scan-probe {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 0;
+  padding: 10px 18px 12px;
+}
+
+.scan-failed {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--vermilion);
+  padding: 15px 18px;
+  display: grid;
+  gap: 9px;
+}
+
+.scan-failed strong {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+
+.scan-square {
+  width: 9px;
+  height: 9px;
+  background: var(--vermilion);
+  flex: none;
+}
+
+.scan-failed p {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-width: 68ch;
+  margin: 0;
+}
+
+/* Its own class rather than the index's `.empty`, which brings a card, a
+   border and a 40ch measure — all of which fight a panel it sits inside. */
+.strays-empty {
+  display: grid;
+  justify-items: center;
+  gap: 11px;
+  padding: 64px 18px 70px;
+  text-align: center;
+}
+
+.empty-square {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--rule);
+}
+
+.strays-empty strong {
+  font-size: 14px;
+}
+
+.strays-empty p {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* The command a stray was observed running, in the Add sheet. */
+.field.flagged input[type='text'] {
+  border-color: rgba(232, 64, 42, 0.5);
+}
+
+.hint.loud {
+  color: var(--vermilion);
+}
+
+.code.observed {
+  font-size: 10.5px;
+  padding: 8px 10px;
+}
+
+.sheet-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  max-width: 42ch;
 }

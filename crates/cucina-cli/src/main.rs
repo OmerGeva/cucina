@@ -314,6 +314,59 @@ fn run(command: &str, args: &Args) -> Result<(), String> {
             }
             Ok(())
         }
+        "strays" => {
+            let mut c = Client::connect_or_launch()?;
+            let found = c.request(&Request::Strays)?.strays();
+            if args.has("json") {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&found).unwrap_or_default()
+                );
+                return Ok(());
+            }
+            if found.is_empty() {
+                println!("  {}", paint.dim("nothing loose"));
+                return Ok(());
+            }
+            for s in &found {
+                // The vermilion mark is the orphan, exactly as on the page:
+                // a process with a terminal behind it is somebody's live work.
+                let mark = if s.is_orphan() {
+                    paint.red("■")
+                } else {
+                    paint.dim("□")
+                };
+                let where_ = s
+                    .dir
+                    .clone()
+                    .unwrap_or_else(|| paint.dim("no working directory"));
+                println!(
+                    "  {mark}  {:<6} {where_}{}",
+                    paint.bold(&format!(":{}", s.port)),
+                    s.owner
+                        .as_ref()
+                        .map(|o| format!("  {}", paint.dim(o)))
+                        .unwrap_or_default()
+                );
+                println!("      {}", paint.dim(&s.command));
+            }
+            println!(
+                "\n  {}",
+                paint.dim("stop one with `cucina stop-stray <pid>`")
+            );
+            Ok(())
+        }
+        "stop-stray" => {
+            let pid: u32 = args
+                .positional
+                .first()
+                .and_then(|v| v.parse().ok())
+                .ok_or("Which pid? e.g. `cucina stop-stray 12904`")?;
+            let mut c = Client::connect_or_launch()?;
+            c.request(&Request::StopStray { pid })?;
+            println!("  {} pid {pid} is gone", paint.dim("○"));
+            Ok(())
+        }
         "open" => {
             let id = need_id(args)?;
             let mut c = Client::connect_or_launch()?;
@@ -482,6 +535,14 @@ fn help(paint: &Paint) -> String {
         (
             format!("{} {}", b("cucina open"), d("<id>")),
             d("open it in the browser"),
+        ),
+        (
+            b("cucina strays"),
+            d("ports held by processes Cucina doesn't own"),
+        ),
+        (
+            format!("{} {}", b("cucina stop-stray"), d("<pid>")),
+            d("stop one of them"),
         ),
         (
             format!("{} {}", b("cucina worktrees"), d("<id>")),

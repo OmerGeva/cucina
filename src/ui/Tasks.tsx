@@ -102,7 +102,10 @@ export default function Tasks({
   return (
     <div className="tasks" ref={box}>
       {tasks.length === 0 && suggestions.length === 0 ? (
-        <p className="tasks-empty">Nothing here yet. Type a command and it stays on this server.</p>
+        <p className="tasks-empty">
+          Nothing here yet.
+          <span>Type a command and it stays on this server.</span>
+        </p>
       ) : null}
 
       <div className="tasks-list" ref={list} onScroll={() => setPeek(null)}>

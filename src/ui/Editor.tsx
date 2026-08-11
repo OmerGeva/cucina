@@ -9,6 +9,9 @@ interface Props {
   server: Server
   home: string
   groups: string[]
+  /** The command line a stray was observed running, when this sheet was opened
+      by adopting one. Set only in that case — see the note by the field. */
+  observed?: string
   onSaved: (server: Server) => void
   onDeleted: (id: string) => void
   onCancel: () => void
@@ -20,6 +23,7 @@ export default function Editor({
   server,
   home,
   groups,
+  observed,
   onSaved,
   onDeleted,
   onCancel,
@@ -183,7 +187,12 @@ export default function Editor({
             </div>
           </div>
 
-          <div className="field">
+          {/* A scanned command line is a runtime artefact, not a start command:
+              absolute interpreter paths, resolved bin shims, flags an agent
+              added. Adopting one unedited would fill Cucina with servers that
+              fail on their second launch — so the field is flagged, and the
+              line as observed stays visible underneath to correct against. */}
+          <div className={`field${observed ? ' flagged' : ''}`}>
             <label htmlFor="cu-cmd">Command</label>
             <input
               id="cu-cmd"
@@ -192,7 +201,17 @@ export default function Editor({
               placeholder="npm run dev"
               onChange={(e) => setCommand(e.target.value)}
             />
-            <span className="hint">Runs in your login shell.</span>
+            {observed ? (
+              <>
+                <span className="hint loud">
+                  This is what the process was running, not a command you would type. Shorten it to
+                  the one that starts this server.
+                </span>
+                <pre className="code observed">{observed}</pre>
+              </>
+            ) : (
+              <span className="hint">Runs in your login shell.</span>
+            )}
           </div>
 
           <div className="field">
@@ -280,6 +299,12 @@ export default function Editor({
         </div>
 
         <div className="sheet-foot">
+          {observed ? (
+            <span className="sheet-note">
+              The process holding the port keeps running. This is still a stray until you stop it
+              and start the server from here.
+            </span>
+          ) : null}
           {!isNew ? (
             <button className="btn danger" onClick={remove} disabled={busy}>
               Delete

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CaretLeft } from '@phosphor-icons/react'
+import { CaretDown, CaretLeft, CaretUp } from '@phosphor-icons/react'
 import type { LogLine, Run, ServerView, Task, Worktree } from '../api'
 import { agentOf, api, elapsed, isRunning, onEvent, shortenPath, uptime } from '../api'
 import AgentMark from './AgentMark'
@@ -204,9 +204,11 @@ export default function Detail({
               onClick={() => setMenu((open) => !open)}
             >
               Tasks
-              <span className="caret" aria-hidden>
-                {menu ? '⌃' : '⌄'}
-              </span>
+              {/* The same caret the project picker and the branch switcher
+                  draw. The bare ⌃/⌄ characters here were a typographic
+                  accident: thin, off the baseline, and from no family the
+                  rest of the interface uses. */}
+              {menu ? <CaretUp weight="bold" /> : <CaretDown weight="bold" />}
             </button>
             {menu ? (
               <Tasks
