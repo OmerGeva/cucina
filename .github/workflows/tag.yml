@@ -1,0 +1,121 @@
+# Merging does not release. The release workflow fires on a version tag, and
+# the tag has to be pushed by hand — which is a thing to remember at the exact
+# moment nobody is thinking about it any more.
+#
+# So when a pull request moves the version, this writes the command onto it,
+# with the number filled in and checked against every file that carries it.
+name: Tag command
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - Cargo.toml
+      - src-tauri/tauri.conf.json
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: tag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    # A pull request from a fork gets a read-only token and could not write
+    # the comment. Skipping is quieter than failing at somebody who has just
+    # sent their first patch.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      # Full history and tags: the base version is read out of git rather than
+      # a checkout of it, and an already-published version has to be caught
+      # here rather than by a release build that fails halfway.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: read
+        run: |
+          set -euo pipefail
+
+          npm_v=$(jq -r .version package.json)
+          tauri_v=$(jq -r .version src-tauri/tauri.conf.json)
+          cargo_v=$(sed -n '/^\[workspace\.package\]/,/^\[/p' Cargo.toml \
+            | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)
+          # The commit rather than the branch name: a pull request is checked
+          # out as its merge result, and the base sha is the one ref that is
+          # certain to be here.
+          was=$(git show "${{ github.event.pull_request.base.sha }}:package.json" | jq -r .version)
+
+          echo "npm=$npm_v"     >> "$GITHUB_OUTPUT"
+          echo "tauri=$tauri_v" >> "$GITHUB_OUTPUT"
+          echo "cargo=$cargo_v" >> "$GITHUB_OUTPUT"
+          echo "was=$was"       >> "$GITHUB_OUTPUT"
+          # Every crate in the lock file has to have moved with them, or the
+          # bundle ships a build whose own version disagrees with its manifest.
+          locked=$(grep -A 1 -E '^name = "cucina-(app|cli|core)"' Cargo.lock \
+            | sed -n 's/^version = "\(.*\)"/\1/p' | sort -u | tr '\n' ' ')
+          echo "locked=${locked% }" >> "$GITHUB_OUTPUT"
+
+          if [ "$npm_v" = "$was" ]; then
+            echo "moved=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "moved=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$npm_v" >/dev/null; then
+            echo "taken=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "taken=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A pull request that touched one of these files without moving the
+      # version is the ordinary case, and it gets nothing said to it.
+      - if: steps.read.outputs.moved == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.read.outputs.npm }}
+          WAS: ${{ steps.read.outputs.was }}
+          TAURI: ${{ steps.read.outputs.tauri }}
+          CARGO: ${{ steps.read.outputs.cargo }}
+          LOCKED: ${{ steps.read.outputs.locked }}
+          TAKEN: ${{ steps.read.outputs.taken }}
+          PR: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+
+          {
+            printf '<!-- tag-command -->\n'
+            printf '**%s → %s.** Merging does not release — the release workflow fires on a version tag. After merge:\n\n' "$WAS" "$V"
+            printf '```sh\ngit checkout master && git pull\ngit tag v%s && git push origin v%s\n```\n\n' "$V" "$V"
+            printf 'That builds the DMG and opens a **draft** release. Publish it by hand, or installed copies keep reporting themselves up to date — `releases/latest` skips drafts.\n'
+
+            if [ "$TAURI" != "$V" ] || [ "$CARGO" != "$V" ] || [ "$LOCKED" != "$V" ]; then
+              printf '\n> [!WARNING]\n'
+              printf '> The four files that carry the version disagree, so this tag would ship a build that misreports itself:\n>\n'
+              printf '> | file | version |\n> | --- | --- |\n'
+              printf '> | `package.json` | `%s` |\n' "$V"
+              printf '> | `src-tauri/tauri.conf.json` | `%s` |\n' "$TAURI"
+              printf '> | `Cargo.toml` | `%s` |\n' "$CARGO"
+              printf '> | `Cargo.lock` | `%s` |\n' "$LOCKED"
+              printf '>\n> `cargo update --workspace` rewrites the lock file after the other three.\n'
+            fi
+
+            if [ "$TAKEN" = "yes" ]; then
+              printf '\n> [!CAUTION]\n'
+              printf '> `v%s` is already a tag. Pick the next number — a tag that is moved rather than added will not rebuild what people have already downloaded.\n' "$V"
+            fi
+          } > body.md
+
+          # One comment per pull request, rewritten in place. A new one on
+          # every push would bury the conversation under its own reminders.
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --jq 'map(select(.body | startswith("<!-- tag-command -->"))) | first | .id // empty')
+
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@body.md
+          else
+            gh pr comment "$PR" --body-file body.md
+          fi
