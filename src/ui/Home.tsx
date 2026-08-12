@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import type { Group, ServerView, Worktree } from '../api'
 import { isLive, sections, spell } from '../api'
 import ServerCard from './ServerCard'
@@ -21,6 +21,9 @@ interface Props {
   groups: Group[]
   /** Read once in App, so a card can show its branch without fetching. */
   trees: Map<string, Worktree[]>
+  /** The launch animation lands its sun on this, so it has to be measurable
+      from outside. Null on the empty states, which have no hero. */
+  disc: RefObject<HTMLSpanElement | null>
   /** null shows everything grouped; a name shows just that project. */
   project: string | null
   now: number
@@ -36,6 +39,7 @@ interface Props {
 export default function Home({
   views,
   trees,
+  disc,
   project,
   now,
   onOpen,
@@ -238,7 +242,7 @@ export default function Home({
         {/* A field of concentric hairlines, and the one solid disc in the app
             sitting off-centre inside it. */}
         <span className="hero-field" aria-hidden />
-        <span className="hero-disc" aria-hidden />
+        <span className="hero-disc" ref={disc} aria-hidden />
 
         <div className="hero-body">
           <h2 className="hero-count">{running.length}</h2>

@@ -212,14 +212,19 @@ export default function Strays({
                         Cancel
                       </button>
                     </>
+                  ) : going === stray.pid ? (
+                    /* On its own, because the word is three times the length
+                       of the one it replaced and the column is a fixed 150px
+                       — two buttons here reach back over the age and the pid.
+                       Adopt would be an offer to keep a process that is being
+                       killed as it is read, so there is nothing to lose. */
+                    <button className="btn small" disabled>
+                      Stopping…
+                    </button>
                   ) : (
                     <>
-                      <button
-                        className="btn small"
-                        disabled={going === stray.pid}
-                        onClick={() => setArmed(stray.pid)}
-                      >
-                        {going === stray.pid ? 'Stopping…' : 'Stop'}
+                      <button className="btn small" onClick={() => setArmed(stray.pid)}>
+                        Stop
                       </button>
                       <button
                         className="btn small"

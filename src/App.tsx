@@ -8,9 +8,14 @@ import Detail from './ui/Detail'
 import Editor from './ui/Editor'
 import Settings from './ui/Settings'
 import Strays from './ui/Strays'
+import Intro from './ui/Intro'
 
 /** Matches the supervisor's ring buffer, so scrollback stays bounded. */
 const MAX_LINES = 2000
+
+/** Opening: the icon, then the sun leaving it for the hero, then the app.
+ *  `holding` also covers the first read, so nothing is shown half-filled. */
+type Launch = 'holding' | 'arriving' | 'done'
 
 export default function App() {
   const [views, setViews] = useState<ServerView[]>([])
@@ -40,6 +45,14 @@ export default function App() {
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [adopting, setAdopting] = useState<string | null>(null)
+  // Someone who has asked for less motion has asked for this most of all, so
+  // for them the app simply opens.
+  const [launch, setLaunch] = useState<Launch>(() =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'done' : 'holding',
+  )
+  /** The first list is in, so the hero exists for the sun to aim at. */
+  const [ready, setReady] = useState(false)
+  const disc = useRef<HTMLSpanElement>(null)
 
   // The listener registers once and reads the open server through a ref,
   // rather than re-subscribing on every navigation.
@@ -73,7 +86,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    // Ready either way: a read that failed is still an answer, and the sun
+    // should not be left sitting on the horizon over it.
+    void refresh().catch(console.error).finally(() => setReady(true))
     void api.homeDir().then(setHome)
   }, [refresh])
 
@@ -227,8 +242,14 @@ export default function App() {
     void api.openUrl(`http://localhost:${port}`).catch(console.error)
   }, [])
 
+  // Both memoised: Intro watches them, and a new identity each render would
+  // restart an effect that is only allowed to run once.
+  const arrive = useCallback(() => setLaunch('arriving'), [])
+  const opened = useCallback(() => setLaunch('done'), [])
+
   return (
-    <div className="app">
+    <>
+    <div className={`app${launch === 'done' ? '' : ` ${launch}`}`}>
       <Rail
         route={route}
         groups={groups}
@@ -282,6 +303,7 @@ export default function App() {
           <Home
             views={views}
             groups={groups}
+            disc={disc}
             trees={trees}
             project={route.kind === 'project' ? route.name : null}
             now={now}
@@ -320,5 +342,11 @@ export default function App() {
         />
       ) : null}
     </div>
+
+    {/* Outside .app, which is held at nothing until the sun has gone. */}
+    {launch === 'done' ? null : (
+      <Intro ready={ready} disc={disc} onSettle={arrive} onDone={opened} />
+    )}
+    </>
   )
 }
