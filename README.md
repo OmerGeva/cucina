@@ -258,8 +258,9 @@ npm run dev       # then open http://localhost:1420/preview.html
 
 `preview.html` renders the real components against a stubbed Tauri bridge, so the UI can be
 worked on in a browser without building the Rust side. `?at=settings`, `?at=server:api` and
-`?at=add` open a specific screen; `?at=strays&strays=none|one|slow|fail` opens each of that
-page's states.
+`?at=add` open a specific screen; `?at=strays&strays=none|one|slow|fail|stopping` opens each of
+that page's states. `?slow=8` runs every timer and animation at a fraction of speed, which is
+the only practical way to look at the launch.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 

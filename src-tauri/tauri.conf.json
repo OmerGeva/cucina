@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cucina",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "com.omergeva.cucina",
   "build": {
     "frontendDist": "../dist",
@@ -22,7 +22,7 @@
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "backgroundColor": "#F0E7D6"
+        "backgroundColor": "#F7F4EC"
       }
     ],
     "security": {

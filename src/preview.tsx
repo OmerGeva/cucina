@@ -361,6 +361,9 @@ if (staged) {
       return STRAY_RESULT[strayState] ?? STRAYS
     }
     if (command === 'stop_stray') {
+      // `stopping` holds the kill open. The busy row is the one state on this
+      // page that is normally over before anyone can look at it.
+      if (strayState === 'stopping') await new Promise((go) => setTimeout(go, 30_000))
       const i = STRAYS.findIndex((s) => s.pid === args.pid)
       if (i >= 0) STRAYS.splice(i, 1)
       console.log(`[harness] stop_stray ${args.pid}`)
@@ -411,6 +414,20 @@ if (at) {
     kind === 'server' ? { kind: 'server', id: arg }
     : kind === 'project' ? { kind: 'project', name: arg }
     : { kind }
+}
+
+// preview.html?slow=6 — every timer and every animation at a sixth of speed,
+// so a launch that is over in two and a half seconds can be looked at properly.
+// Timers are stretched here; the animations themselves are caught as they
+// appear, which covers the ones CSS starts as well as the ones code does.
+const slow = Number(new URLSearchParams(location.search).get('slow')) || 1
+if (slow > 1) {
+  const timer = window.setTimeout.bind(window)
+  window.setTimeout = ((fn: TimerHandler, ms = 0, ...rest: unknown[]) =>
+    timer(fn, ms * slow, ...(rest as []))) as typeof window.setTimeout
+  setInterval(() => {
+    for (const a of document.getAnimations()) a.playbackRate = 1 / slow
+  }, 25)
 }
 
 const { default: App } = await import('./App')

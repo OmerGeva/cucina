@@ -2359,3 +2359,155 @@ label.toggle input {
   color: var(--ink-3);
   max-width: 42ch;
 }
+
+/* ---- launch ------------------------------------------------------------- */
+
+/* The icon at size: the window's ruling, a horizon across it, and the sun.
+   Above everything, including the sheet, because at this point there is
+   nothing else. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+/* Three boxes around one disc, so each animation owns one axis and none of
+   them has to know what the others are doing. The arc is placed where the mark
+   puts the sun: centre --clear above the line, which leaves the disc's foot
+   below it. */
+.intro-arc {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--horizon) - var(--rule) / 2 - var(--clear) - var(--sun) / 2);
+  width: var(--sun);
+  height: var(--sun);
+  transform: translateX(-50%);
+}
+
+.intro-lift,
+.intro-sun {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.intro-sun {
+  border-radius: 50%;
+  background: var(--vermilion);
+}
+
+/* The window's ruling, repeated exactly, over everything the sun has not risen
+   out of yet — the same colour and the same 8px pitch off the same fixed
+   origin, so it cannot be seen and does not have to be explained. It is the
+   one opaque thing here, and it is opaque for one reason. */
+.intro-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: calc(var(--horizon) + var(--rule) / 2);
+  background-color: var(--ground);
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(26, 24, 21, 0.055) 0 1px,
+    transparent 1px 8px
+  );
+  background-attachment: fixed;
+}
+
+/* The horizon. Long enough to hold the sun and no longer, until it runs out
+   to both edges and takes the launch screen with it. */
+.intro-rule {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--horizon) - var(--rule) / 2);
+  width: var(--plate);
+  height: var(--rule);
+  background: var(--ink);
+  transform: translateX(-50%);
+  transform-origin: 50% 50%;
+}
+
+/* Laid out, measured, and not yet shown: the sun needs the hero's rect to aim
+   at, and the reveal wants no reflow in it. */
+.app.holding > * {
+  opacity: 0;
+}
+
+/* The hero's own disc waits until the flying one is on top of it. Two of the
+   same circle, one of them already at the destination, gives it away. */
+.app.holding .hero-disc,
+.app.arriving .hero-disc {
+  visibility: hidden;
+}
+
+/* Then everything arrives while the sun is still travelling, from the frame
+   inwards: the rail, the name, the paper, and last what is printed on it.
+   Nothing here moves the hero — the card fades and does not rise, because the
+   sun is aimed at a disc inside it. */
+.app.arriving .rail {
+  animation: arrive-left 560ms var(--ease-out) both;
+}
+
+.app.arriving .page-head {
+  animation: arrive 560ms 90ms var(--ease-out) both;
+}
+
+.app.arriving .hero {
+  animation: fade 620ms 150ms var(--ease-out) both;
+}
+
+.app.arriving .hero-body {
+  animation: arrive 560ms 300ms var(--ease-out) both;
+}
+
+.app.arriving .hero-foot {
+  animation: arrive 520ms 400ms var(--ease-out) both;
+}
+
+/* Anything a screen other than Home puts under the head. */
+.app.arriving .empty,
+.app.arriving .panel,
+.app.arriving .page-note {
+  animation: arrive 560ms 220ms var(--ease-out) both;
+}
+
+/* Only the harness opens straight into the sheet, but a sheet that snapped in
+   while everything under it was still arriving would look like a fault. */
+.app.arriving .scrim {
+  animation: fade 560ms 220ms var(--ease-out) both;
+}
+
+.app.arriving .section-head {
+  animation: arrive 500ms 430ms var(--ease-out) both;
+}
+
+/* Left to right across the grid, and then no further: a cascade that keeps
+   counting past the first row stops reading as one movement and starts
+   reading as a wait. */
+.app.arriving .grid > * {
+  animation: arrive 520ms 480ms var(--ease-out) both;
+}
+.app.arriving .grid > *:nth-child(2) {
+  animation-delay: 535ms;
+}
+.app.arriving .grid > *:nth-child(3) {
+  animation-delay: 590ms;
+}
+.app.arriving .grid > *:nth-child(n + 4) {
+  animation-delay: 645ms;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
+@keyframes arrive-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
